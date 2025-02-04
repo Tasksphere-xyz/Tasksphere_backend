@@ -14,6 +14,11 @@ dotenv.config();
       database: process.env.DB_NAME,
       autoLoadEntities: true,
       synchronize: process.env.NODE_ENV !== 'production',
+      extra: {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      },
     }),
     AuthModule,
   ],
