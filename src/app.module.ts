@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import * as dotenv from 'dotenv';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './modules/auth/auth.module';
+import { MemberModule } from './modules/member/member.module';
 dotenv.config();
 @Module({
   imports: [
@@ -13,10 +14,11 @@ dotenv.config();
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       autoLoadEntities: true,
-      // synchronize: process.env.NODE_ENV !== 'production',
-      synchronize: false,
+      synchronize: process.env.NODE_ENV !== 'production',
+      // synchronize: false,
     }),
     AuthModule,
+    MemberModule,
   ],
 })
 export class AppModule {}
