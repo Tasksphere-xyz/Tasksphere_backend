@@ -19,7 +19,7 @@ import { User } from 'src/entities/user.entity';
       signOptions: { expiresIn: '3d' },
     }),
   ],
-  providers: [AuthService, GoogleStrategy],
   controllers: [AuthController],
+  providers: [AuthService, GoogleStrategy],
 })
 export class AuthModule {}

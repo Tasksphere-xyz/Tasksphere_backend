@@ -6,6 +6,7 @@ import { GoogleAuthGuard } from "src/common/guards/google-auth.guard";
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   async googleLogin(): Promise<{ url: string }> {
