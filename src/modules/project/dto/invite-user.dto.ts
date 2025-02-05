@@ -1,7 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty } from 'class-validator';
 
 export class InviteUserDto {
-    @IsNotEmpty()
-    @IsEmail()
-    email: string;
+  @ApiProperty({ description: 'email of the user to invite' })
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
 }

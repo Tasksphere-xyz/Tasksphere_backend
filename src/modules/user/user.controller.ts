@@ -1,5 +1,5 @@
 import { Controller, Body, Patch, Req, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPayload } from 'express';
@@ -11,6 +11,11 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Patch('update')
+  @ApiResponse({
+    status: 200,
+    description: 'User profile updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'User not found' })
   @UseGuards(JwtAuthGuard)
   async create(
     @Body() updateUserDto: UpdateUserDto,

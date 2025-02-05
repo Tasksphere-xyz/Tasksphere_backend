@@ -57,7 +57,7 @@ export class WorkspaceService {
       status: 'accepted',
     });
 
-    return createResponse(true, 'Project created successfully', {
+    return createResponse(true, 'Workspace created successfully', {
       newWorkspace,
     });
   }
@@ -94,7 +94,7 @@ export class WorkspaceService {
     );
     if (existingMembership) {
       throw new BadRequestException(
-        'User is already a member of the  workspace.',
+        'User is already a member of the workspace.',
       );
     }
 
