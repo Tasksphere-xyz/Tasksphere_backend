@@ -13,7 +13,8 @@ import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { ProjectMembership } from 'src/entities/project-membership.entity';
 import { createResponse } from 'src/common/dto/response.dto';
 import { InviteUserDto } from '../project/dto/invite-user.dto';
-import { User } from 'src/entities/user.entity';
+// import { User } from 'src/entities/user.entity';
+import { EmailService } from 'src/common/email/email.service';
 
 @Injectable()
 export class WorkspaceService {
@@ -24,8 +25,9 @@ export class WorkspaceService {
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(WorkspaceMembership)
     private workspaceMembershipRepository: Repository<WorkspaceMembership>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    // @InjectRepository(User)
+    // private userRepository: Repository<User>,
+    private emailService: EmailService,
   ) {}
 
   async createWorkspace(
@@ -33,11 +35,11 @@ export class WorkspaceService {
     user: UserPayload,
     project_id: number,
   ) {
-    const isMember = await this.projectMembershipRepository.findOne({
+    const isMemberOfProject = await this.projectMembershipRepository.findOne({
       where: { project_id, email: user.email, status: 'accepted' },
     });
 
-    if (!isMember) {
+    if (!isMemberOfProject) {
       throw new BadRequestException("Can't create a workspace");
     }
 
@@ -57,7 +59,7 @@ export class WorkspaceService {
       status: 'accepted',
     });
 
-    return createResponse(true, 'Project created successfully', {
+    return createResponse(true, 'Workspace created successfully', {
       newWorkspace,
     });
   }
@@ -78,47 +80,59 @@ export class WorkspaceService {
       where: { workspace_id, email: user.email, status: 'accepted' },
     });
     if (!inviter || inviter.role !== 'admin') {
-      throw new ForbiddenException('Unauthorized access.');
+      throw new ForbiddenException('Not authorized to invite users.');
     }
 
-    // check if user exists at all
-    const { email } = inviteUserDto;
-    const foundUser = await this.userRepository.findOne({ where: { email } });
-    if (!foundUser) {
-      throw new NotFoundException('User not found');
-    }
+    const { emails } = inviteUserDto;
+    const existingMembers: string[] = [];
+    const nonProjectMembers: string[] = [];
+    const invitedMembers: string[] = [];
 
-    //check if user is already a memeber
-    const existingMembership = await this.workspaceMembershipRepository.findOne(
-      { where: { workspace_id, email } },
-    );
-    if (existingMembership) {
-      throw new BadRequestException(
-        'User is already a member of the  workspace.',
-      );
-    }
+    for (const email of emails) {
+      // Check if user exists
+      // const foundUser = await this.userRepository.findOne({ where: { email } });
+      // if (!foundUser) {
+      //   nonProjectMembers.push(email);
+      //   continue; // Skip to next email
+      // }
 
-    // check if user is a part of the project
-    const projectMembership = await this.projectMembershipRepository.findOne({
-      where: {
-        project_id: workspace.project_id,
+      // Check if user is already a member of the workspace
+      const existingMembership =
+        await this.workspaceMembershipRepository.findOne({
+          where: { workspace_id, email },
+        });
+      if (existingMembership) {
+        existingMembers.push(email);
+        continue;
+      }
+
+      // Check if user is part of the project
+      const isMemberOfProject = await this.projectMembershipRepository.findOne({
+        where: { project_id: workspace.project_id, email },
+      });
+      if (!isMemberOfProject) {
+        nonProjectMembers.push(email);
+        continue;
+      }
+
+      // Send invitation email
+      await this.emailService.sendEmail(
         email,
-      },
-    });
-    if (!projectMembership) {
-      throw new ForbiddenException('User must be part of the project.');
+        'Invitation to join Workspace',
+        `${inviter.email} has invited you to join this workspace. Click <a href="#">here</a> to accept the invitation.`,
+      );
+
+      invitedMembers.push(email);
     }
 
-    // Add user to workspace_membership as pending
-    const inviteInfo = await this.workspaceMembershipRepository.save({
-      workspace_id,
-      email,
-      role: 'member',
-      status: 'pending',
-    });
+    const message = `${invitedMembers.length} ${
+      invitedMembers.length > 1 ? 'Users' : 'User'
+    } invited to project successfully`;
 
-    return createResponse(true, 'User invited to workspace successfully', {
-      inviteInfo,
+    return createResponse(true, message, {
+      existingMembers,
+      nonProjectMembers,
+      invitedMembers,
     });
   }
 }

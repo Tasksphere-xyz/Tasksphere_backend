@@ -1,5 +1,14 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectService } from './project.service';
@@ -12,6 +21,8 @@ export class ProjectController {
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Project created successfully' })
+  @ApiResponse({ status: 400, description: 'Failed to create project' })
   async createProject(@Body() createProjectDto: CreateProjectDto, @Req() req) {
     const user = req.user;
     return await this.projectService.createProject(createProjectDto, user);
@@ -19,16 +30,44 @@ export class ProjectController {
 
   @Post(':projectId/invite')
   @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'User invited to project successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Unauthorized access' })
+  @ApiParam({ name: 'projectId', description: 'id of the project' })
   async inviteToProject(
     @Param('projectId') projectId: number,
     @Body() inviteUserDto: InviteUserDto,
     @Req() req,
   ) {
     const user = req.user;
-      return await this.projectService.inviteUserToProject(
-        projectId,
-        inviteUserDto,
-        user,
+    return await this.projectService.inviteUserToProject(
+      projectId,
+      inviteUserDto,
+      user,
     );
+  }
+
+  @Get(':projectId/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Project members fetched successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Project not found' })
+  @ApiParam({ name: 'projectId', description: 'id of the project' })
+  @ApiQuery({
+    name: 'page',
+    required: true,
+    description: 'Page number for pagination',
+  })
+  async getProjectMembers(
+    @Param('projectId') projectId: number,
+    @Req() req,
+    @Query('page') page: number,
+  ) {
+    const user = req.user
+    return this.projectService.getProjectMembers(projectId, user, page);
   }
 }

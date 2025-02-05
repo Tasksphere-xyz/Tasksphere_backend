@@ -1,5 +1,5 @@
 import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkspaceService } from './workspace.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -12,6 +12,9 @@ export class WorkspaceController {
 
   @Post('create/:projectId')
   @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Workspace created successfully' })
+  @ApiResponse({ status: 400, description: 'Failed to create workspace' })
+  @ApiParam({ name: 'projectId', description: 'id of the project' })
   async createProject(
     @Param('projectId') projectId: string,
     @Body() createWorkspaceDto: CreateWorkspaceDto,
@@ -27,6 +30,12 @@ export class WorkspaceController {
 
   @Post(':workspaceId/invite')
   @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'User invited to workspace successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Unauthorized access' })
+  @ApiParam({ name: 'workspaceId', description: 'id of the workspace' })
   async inviteToWorkspace(
     @Param('workspaceId') workspaceId: number,
     @Body() inviteUserDto: InviteUserDto,

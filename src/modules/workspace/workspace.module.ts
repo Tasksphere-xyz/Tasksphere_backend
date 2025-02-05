@@ -6,6 +6,7 @@ import { Workspace } from 'src/entities/workspace.entity';
 import { WorkspaceController } from './workspace.controller';
 import { WorkspaceService } from './workspace.service';
 import { User } from 'src/entities/user.entity';
+import { EmailService } from 'src/common/email/email.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { User } from 'src/entities/user.entity';
     ]),
   ],
   controllers: [WorkspaceController],
-  providers: [WorkspaceService],
+  providers: [WorkspaceService, EmailService],
 })
 export class WorkspaceModule {}
