@@ -38,6 +38,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     const { access_token, user } = await this.authService.googleAuthValidate(
       userDetails,
     );
+    
     return cb(null, { access_token, user });
   }
 }

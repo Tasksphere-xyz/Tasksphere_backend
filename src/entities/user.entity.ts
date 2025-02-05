@@ -21,9 +21,6 @@ export class User {
   displayPic: string;
 
   @Column({ nullable: false })
-  role: 'admin' | 'member';
-
-  @Column({ nullable: false })
   googleId: string;
 
   @CreateDateColumn({ nullable: false })

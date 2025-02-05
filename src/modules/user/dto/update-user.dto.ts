@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum } from 'class-validator';
 
-export class UpdateMemberDto {
+export class UpdateUserDto {
   @IsOptional()
   @IsString()
   username?: string;
@@ -8,10 +8,4 @@ export class UpdateMemberDto {
   @IsOptional()
   @IsString()
   displayPic?: string;
-
-  @IsOptional()
-  @IsEnum(['admin', 'member'], {
-    message: 'role must be either "admin" or "member".',
-  })
-  role?: 'admin' | 'member';
 }

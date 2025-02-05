@@ -4,7 +4,6 @@ import { GoogleAuthDto } from './dto/google-auth.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
-import { UserPayload } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -22,12 +21,11 @@ export class AuthService {
     if (!user) {
       const user = this.userRepository.create({
         ...GoogleAuthDto,
-        role: 'member',
       });
       await this.userRepository.save(user);
     }
 
-    const payload: UserPayload = { email: user.email, role: user.role };
+    const payload = { email: user.email };
     const access_token = this.jwtService.sign(payload);
 
     return {

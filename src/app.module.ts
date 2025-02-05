@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import * as dotenv from 'dotenv';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './modules/auth/auth.module';
-import { MemberModule } from './modules/member/member.module';
+import { UserModule } from './modules/user/user.module';
+import { ProjectModule } from './modules/project/project.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 dotenv.config();
 @Module({
   imports: [
@@ -15,10 +17,16 @@ dotenv.config();
       database: process.env.DB_NAME,
       autoLoadEntities: true,
       synchronize: process.env.NODE_ENV !== 'production',
-      // synchronize: false,
+      extra: {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      },
     }),
     AuthModule,
-    MemberModule,
+    UserModule,
+    ProjectModule,
+    WorkspaceModule,
   ],
 })
 export class AppModule {}

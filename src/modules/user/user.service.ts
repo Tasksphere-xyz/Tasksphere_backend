@@ -1,13 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UpdateMemberDto } from './dto/update-member.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
 import { UserPayload } from 'express';
 import { createResponse } from 'src/common/dto/response.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
 
 @Injectable()
-export class MemberService {
+export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -15,7 +16,6 @@ export class MemberService {
 
   public async findUserByEmail(
     email: string,
-    filePath?: string,
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { email },
@@ -28,15 +28,14 @@ export class MemberService {
     return user;
   }
 
-  async updateUserProfile(updateMemberDto: UpdateMemberDto, user: UserPayload) {
-    const { username, displayPic, role } = updateMemberDto;
+  async updateUserProfile(updateUserDto: UpdateUserDto, user: UserPayload) {
+    const { username, displayPic } = updateUserDto;
 
     const foundUser = await this.findUserByEmail(user.email);
 
     // check this 3 lines to make sure nothing goes wrong if a part of dto is missing
     foundUser.username = username;
     foundUser.displayPic = displayPic;
-    foundUser.role = role;
 
     await this.userRepository.save(foundUser);
 
