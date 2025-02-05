@@ -22,7 +22,7 @@ import {
     status: 'pending' | 'accepted' | 'declined';
 
     @Column({ nullable: true })
-    role: 'admin' | 'member' | 'owner' | 'viewer';
+    role: 'admin' | 'member' | 'owner';
   
     @CreateDateColumn({ nullable: false })
     invited_at: Date;
