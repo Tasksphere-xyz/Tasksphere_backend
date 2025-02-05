@@ -5,6 +5,7 @@ import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { Workspace } from 'src/entities/workspace.entity';
 import { WorkspaceController } from './workspace.controller';
 import { WorkspaceService } from './workspace.service';
+import { User } from 'src/entities/user.entity';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { WorkspaceService } from './workspace.service';
       ProjectMembership,
       Workspace,
       WorkspaceMembership,
+      User
     ]),
   ],
   controllers: [WorkspaceController],
