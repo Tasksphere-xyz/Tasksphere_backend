@@ -1,5 +1,14 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectService } from './project.service';
@@ -38,5 +47,27 @@ export class ProjectController {
       inviteUserDto,
       user,
     );
+  }
+
+  @Get(':projectId/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Project members fetched successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Project not found' })
+  @ApiParam({ name: 'projectId', description: 'id of the project' })
+  @ApiQuery({
+    name: 'page',
+    required: true,
+    description: 'Page number for pagination',
+  })
+  async getProjectMembers(
+    @Param('projectId') projectId: number,
+    @Req() req,
+    @Query('page') page: number,
+  ) {
+    const user = req.user
+    return this.projectService.getProjectMembers(projectId, user, page);
   }
 }

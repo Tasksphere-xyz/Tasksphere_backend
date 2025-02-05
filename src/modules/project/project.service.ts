@@ -24,6 +24,23 @@ export class ProjectService {
     private emailService: EmailService,
   ) {}
 
+  private async checkProjectMembership(
+    project_id: number,
+    email: string,
+    status?: 'accepted' | 'pending' | 'rejected',
+  ) {
+    const whereConditions: any = { project_id, email };
+    if (status) {
+      whereConditions.status = status;
+    }
+
+    const membership = await this.projectMembershipRepository.findOne({
+      where: whereConditions,
+    });
+
+    return membership; // Returns null if user is not a member
+  }
+
   async createProject(createProjectDto: CreateProjectDto, user: UserPayload) {
     const { project_name, description } = createProjectDto;
     const newProject = await this.projectRepository.save({
@@ -51,9 +68,11 @@ export class ProjectService {
     user: UserPayload,
   ) {
     // check the eligibility of the inviter
-    const inviter = await this.projectMembershipRepository.findOne({
-      where: { project_id, email: user.email, status: 'accepted' },
-    });
+    const inviter = await this.checkProjectMembership(
+      project_id,
+      user.email,
+      'accepted',
+    );
     if (!inviter || (inviter.role !== 'owner' && inviter.role !== 'admin')) {
       throw new ForbiddenException('Not authorized to invite users');
     }
@@ -65,10 +84,9 @@ export class ProjectService {
 
     for (const email of emails) {
       // Check if user is already part of the project
-      const existingMembership = await this.projectMembershipRepository.findOne(
-        {
-          where: { project_id, email },
-        },
+      const existingMembership = await this.checkProjectMembership(
+        project_id,
+        email,
       );
       if (existingMembership) {
         existingMembers.push(email);
@@ -92,6 +110,54 @@ export class ProjectService {
     return createResponse(true, message, {
       existingMembers,
       invitedMembers,
+    });
+  }
+
+  async getProjectMembers(
+    project_id: number,
+    user: UserPayload,
+    page: number = 1,
+  ) {
+    page = page > 0 ? page : 1;
+    const limit = 10;
+
+    const skip = (page - 1) * limit;
+
+    const project = await this.projectRepository.findOne({
+      where: { id: project_id },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const userMembership = await this.checkProjectMembership(
+      project_id,
+      user.email,
+    );
+    if (!userMembership) {
+      throw new ForbiddenException('not a memeber of the Project');
+    }
+
+    // Fetch all project members
+    const [members, total] =
+      await this.projectMembershipRepository.findAndCount({
+        where: { project_id },
+        order: { createdAt: 'DESC' },
+        skip,
+        take: limit,
+      });
+
+    const totalPages = Math.ceil(total / limit);
+
+    const message =
+      members.length === 0
+        ? 'no team members found'
+        : 'team members retrieved successfully';
+
+    return createResponse(true, message, {
+      members,
+      totalPages: totalPages === 0 ? 1 : totalPages,
+      currentPage: page,
     });
   }
 }
