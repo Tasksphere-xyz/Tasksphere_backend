@@ -1,9 +1,11 @@
-import { Controller, Body, Patch, Req, UseGuards } from '@nestjs/common';
-import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Body, Patch, Req, UseGuards, UseInterceptors, UploadedFile, UnauthorizedException } from '@nestjs/common';
+import { ApiConsumes, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPayload } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerConfig } from 'src/utils/multer.util';
 
 @ApiTags('user')
 @Controller('user')
@@ -11,17 +13,23 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Patch('update')
+  @UseGuards(JwtAuthGuard)
+  @ApiConsumes('multipart/form-data')
   @ApiResponse({
     status: 200,
     description: 'User profile updated successfully',
   })
   @ApiResponse({ status: 400, description: 'User not found' })
-  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('profileImg', multerConfig))
   async create(
     @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file: Express.Multer.File,
     @Req() req: Request & { user: UserPayload },
   ) {
     const user = req.user;
-    return await this.userService.updateUserProfile(updateUserDto, user);
+    if (!file) {
+      throw new UnauthorizedException('no file uploaded');
+    }
+    return await this.userService.updateUserProfile(updateUserDto, user, file.path);
   }
 }

@@ -11,22 +11,22 @@ export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Post('create')
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Project created successfully' })
   @ApiResponse({ status: 400, description: 'Failed to create project' })
-  @UseGuards(JwtAuthGuard)
   async createProject(@Body() createProjectDto: CreateProjectDto, @Req() req) {
     const user = req.user;
     return await this.projectService.createProject(createProjectDto, user);
   }
 
   @Post(':projectId/invite')
+  @UseGuards(JwtAuthGuard)
   @ApiResponse({
     status: 200,
     description: 'User invited to project successfully',
   })
   @ApiResponse({ status: 400, description: 'Unauthorized access' })
   @ApiParam({ name: 'projectId', description: 'id of the project' })
-  @UseGuards(JwtAuthGuard)
   async inviteToProject(
     @Param('projectId') projectId: number,
     @Body() inviteUserDto: InviteUserDto,

@@ -6,9 +6,4 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   username?: string;
-
-  @ApiProperty({ description: 'display picture url of the user' })
-  @IsOptional()
-  @IsString()
-  displayPic?: string;
 }
