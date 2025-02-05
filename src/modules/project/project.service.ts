@@ -12,7 +12,7 @@ import { Repository } from 'typeorm';
 import { ProjectMembership } from 'src/entities/project-membership.entity';
 import { createResponse } from 'src/common/dto/response.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
-import { User } from 'src/entities/user.entity';
+import { EmailService } from 'src/common/email/email.service';
 
 @Injectable()
 export class ProjectService {
@@ -21,8 +21,7 @@ export class ProjectService {
     private projectRepository: Repository<Project>,
     @InjectRepository(ProjectMembership)
     private projectMembershipRepository: Repository<ProjectMembership>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private emailService: EmailService,
   ) {}
 
   async createProject(createProjectDto: CreateProjectDto, user: UserPayload) {
@@ -56,32 +55,43 @@ export class ProjectService {
       where: { project_id, email: user.email, status: 'accepted' },
     });
     if (!inviter || (inviter.role !== 'owner' && inviter.role !== 'admin')) {
-      throw new ForbiddenException('Unauthorized access.');
+      throw new ForbiddenException('Not authorized to invite users');
     }
 
     // check if user is already part of the project
-    const { email } = inviteUserDto;
-    const existingMembership = await this.projectMembershipRepository.findOne({
-      where: { project_id, email },
-    });
-    if (existingMembership) {
-      throw new BadRequestException('User is already a member of the project.');
+    const { emails } = inviteUserDto;
+    const existingMembers: string[] = [];
+    const invitedMembers: string[] = [];
+
+    for (const email of emails) {
+      // Check if user is already part of the project
+      const existingMembership = await this.projectMembershipRepository.findOne(
+        {
+          where: { project_id, email },
+        },
+      );
+      if (existingMembership) {
+        existingMembers.push(email);
+        continue;
+      }
+
+      // Send the invitation email
+      await this.emailService.sendEmail(
+        email,
+        'Invitation to join Project',
+        `${inviter.email} has invited you to join this project. Click <a href="#">here</a> to accept the invitation.`,
+      );
+
+      invitedMembers.push(email);
     }
 
-    // Find invitee by email
-    const foundUser = await this.userRepository.findOne({ where: { email } });
-    if (!foundUser) {
-      throw new NotFoundException('User not found');
-    }
+    const message = `${invitedMembers.length} ${
+      invitedMembers.length > 1 ? 'Users' : 'User'
+    } invited to project successfully`;
 
-    // Add user to project_membership as pending
-    const inviteInfo = await this.projectMembershipRepository.save({
-      project_id,
-      email,
-      role: 'member',
-      status: 'pending',
+    return createResponse(true, message, {
+      existingMembers,
+      invitedMembers,
     });
-
-    return createResponse(true, 'User invited to project successfully', { inviteInfo });
   }
 }
