@@ -42,6 +42,22 @@ export class CloudinaryProvider {
     }
   }
 
+  async uploadPdfToCloud(filePath: string) {
+    try {
+      const options: UploadApiOptions = {
+        resource_type: 'raw',
+        use_filename: true,
+        unique_filename: false,
+        overwrite: true,
+        invalidate: true,
+      };
+      return await cloudinary.uploader.upload(filePath, options);
+    } catch (error) {
+      console.error('Error uploading pdf:', error);
+      throw new Error('Failed to upload pdf');
+    }
+  }
+
   async deleteSingleImageFromCloud(filePath: string) {
     try {
       const parts = filePath.split('/');
@@ -55,6 +71,34 @@ export class CloudinaryProvider {
     } catch (error) {
       console.error('Error deleting image:', error);
       throw new Error('Failed to delete image');
+    }
+  }
+  
+  async deleteImagesFromCloud(filePaths: string[]) {
+    try {
+      const publicIds = this.getPublicIds(filePaths);
+      const options: UploadApiOptions = {
+        invalidate: true,
+        resource_type: 'image',
+      };
+      return await cloudinary.api.delete_resources(publicIds, options);
+    } catch (error) {
+      console.error('Error deleting images:', error);
+      throw new Error('Failed to delete images');
+    }
+  }
+
+  async deletePdfsFromCloud(filePaths: string[]) {
+    try {
+      const publicIds = this.getPublicIds(filePaths);
+      const options: UploadApiOptions = {
+        invalidate: true,
+        resource_type: 'raw',
+      };
+      return await cloudinary.api.delete_resources(publicIds, options);
+    } catch (error) {
+      console.error('Error deleting Pdfs:', error);
+      throw new Error('Failed to delete Pdfs');
     }
   }
 }

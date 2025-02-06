@@ -26,10 +26,11 @@ export const multerConfig = {
     file: Express.Multer.File,
     cb: FileFilterCallback,
   ) => {
-    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
-      cb(null, false);
-      return cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      cb(new Error('Only PDF, JPEG, and PNG files are allowed'));
+    } else {
+      cb(null, true);
     }
-    cb(null, true);
   },
 };

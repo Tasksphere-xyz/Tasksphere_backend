@@ -38,7 +38,7 @@ export class ProjectService {
       where: whereConditions,
     });
 
-    return membership; // Returns null if user is not a member
+    return membership; 
   }
 
   async createProject(createProjectDto: CreateProjectDto, user: UserPayload) {
