@@ -36,37 +36,41 @@ export class UserService {
     filePath: string,
   ) {
     const { username } = updateUserDto;
-
     const foundUser = await this.findUserByEmail(user.email);
-    const imageToBeDeleted = foundUser.displayPic;
-
-    const newFilename = `${Date.now()}_${foundUser.username}_dp${path.extname(
-      filePath,
-    )}`;
-    const newFilePath = path.resolve(
-      __dirname,
-      `../../../uploads/${newFilename}`,
-    );
-    fs.renameSync(filePath, newFilePath);
-
-    const response = await this.cloudinaryProvider.uploadImageToCloud(
-      newFilePath,
-    );
 
     if (username) {
       foundUser.username = username;
     }
-    foundUser.displayPic = response.secure_url;
 
-    await this.userRepository.save(foundUser);
+    if (filePath) {
+      const imageToBeDeleted = foundUser.displayPic;
 
-    if (imageToBeDeleted) {
-      await this.cloudinaryProvider.deleteSingleImageFromCloud(
-        imageToBeDeleted,
+      const newFilename = `${Date.now()}_${foundUser.username}_dp${path.extname(
+        filePath,
+      )}`;
+      const newFilePath = path.resolve(
+        __dirname,
+        `../../../uploads/${newFilename}`,
       );
+      fs.renameSync(filePath, newFilePath);
+
+      const response = await this.cloudinaryProvider.uploadImageToCloud(
+        newFilePath,
+      );
+
+      foundUser.displayPic = response.secure_url;
+
+      await this.userRepository.save(foundUser);
+
+      if (imageToBeDeleted) {
+        await this.cloudinaryProvider.deleteSingleImageFromCloud(
+          imageToBeDeleted,
+        );
+      }
+
+      unlinkSavedFile(newFilePath);
     }
 
-    unlinkSavedFile(newFilePath);
     return createResponse(true, 'User profile updated successfully', {
       username: foundUser.username,
       displayPic: foundUser.displayPic,

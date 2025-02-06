@@ -4,6 +4,7 @@ import { WorkspaceService } from './workspace.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteUserDto } from '../project/dto/invite-user.dto';
+import { UserPayload } from 'express';
 
 @ApiTags('workspace')
 @Controller('workspace')
@@ -18,7 +19,7 @@ export class WorkspaceController {
   async createProject(
     @Param('projectId') projectId: string,
     @Body() createWorkspaceDto: CreateWorkspaceDto,
-    @Req() req,
+    @Req() req: Request & { user: UserPayload },
   ) {
     const user = req.user;
     return await this.workspaceService.createWorkspace(
@@ -39,7 +40,7 @@ export class WorkspaceController {
   async inviteToWorkspace(
     @Param('workspaceId') workspaceId: number,
     @Body() inviteUserDto: InviteUserDto,
-    @Req() req,
+    @Req() req: Request & { user: UserPayload },
   ) {
     const user = req.user;
     return await this.workspaceService.inviteUserToWorkspace(

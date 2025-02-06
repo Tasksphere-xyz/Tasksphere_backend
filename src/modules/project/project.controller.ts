@@ -13,6 +13,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectService } from './project.service';
 import { InviteUserDto } from './dto/invite-user.dto';
+import { UserPayload } from 'express';
 
 @ApiTags('project')
 @Controller('project')
@@ -39,7 +40,7 @@ export class ProjectController {
   async inviteToProject(
     @Param('projectId') projectId: number,
     @Body() inviteUserDto: InviteUserDto,
-    @Req() req,
+    @Req() req: Request & { user: UserPayload },
   ) {
     const user = req.user;
     return await this.projectService.inviteUserToProject(
@@ -64,7 +65,7 @@ export class ProjectController {
   })
   async getProjectMembers(
     @Param('projectId') projectId: number,
-    @Req() req,
+    @Req() req: Request & { user: UserPayload },
     @Query('page') page: number,
   ) {
     const user = req.user

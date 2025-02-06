@@ -5,6 +5,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { ProjectModule } from './modules/project/project.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
+import { TaskModule } from './modules/task/task.module';
 dotenv.config();
 @Module({
   imports: [
@@ -27,6 +28,7 @@ dotenv.config();
     UserModule,
     ProjectModule,
     WorkspaceModule,
+    TaskModule
   ],
 })
 export class AppModule {}
