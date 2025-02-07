@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   ForbiddenException,
@@ -133,6 +134,50 @@ export class WorkspaceService {
       existingMembers,
       nonProjectMembers,
       invitedMembers,
+    });
+  }
+
+  async getAllUserWorkspaces(user: UserPayload) {
+    const workspaces = await this.workspaceMembershipRepository.find({
+      where: { email: user.email, status: 'accepted' },
+      relations: ['workspace'],
+    });
+
+    if (!workspaces.length) {
+      throw new NotFoundException('No workspaces found');
+    }
+
+    const userWorkspaces = workspaces.map((membership) => membership.workspace);
+
+    return createResponse(true, 'Workspaces retrieved successfully', {
+      workspaces: userWorkspaces,
+    });
+}
+
+
+  async joinWorkspace(workspace_id: number, user: UserPayload) {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspace_id },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const invitation = await this.workspaceMembershipRepository.findOne({
+      where: { workspace_id, email: user.email, status: 'pending' },
+    });
+
+    if (!invitation) {
+      throw new ForbiddenException('You are not invited to this workspace');
+    }
+
+    // Update the invitation status to accepted
+    invitation.status = 'accepted';
+    await this.workspaceMembershipRepository.save(invitation);
+
+    return createResponse(true, 'Successfully joined the workspace', {
+      workspace,
     });
   }
 }

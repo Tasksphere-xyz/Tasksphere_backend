@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
@@ -9,12 +10,18 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
 import { unlinkSavedFile } from 'src/utils/unlinkImage.util';
+import { Task } from 'src/entities/task.entity';
+import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Task)
+    private taskRepository: Repository<Task>,
+    @InjectRepository(WorkspaceMembership)
+    private workspaceMembershipRepository: Repository<WorkspaceMembership>,
     private readonly cloudinaryProvider: CloudinaryProvider,
   ) {}
 
@@ -74,6 +81,40 @@ export class UserService {
     return createResponse(true, 'User profile updated successfully', {
       username: foundUser.username,
       displayPic: foundUser.displayPic,
+    });
+  }
+
+  async getUserProfile(user: UserPayload) {
+    // Retrieve user details
+    const foundUser = await this.findUserByEmail(user.email);
+
+    // Fetch user's tasks overview
+    const [totalTasks, tasksInProgress, completedTasks, workspaceMemberships] = await Promise.all([
+      this.taskRepository.count({ where: { user_id: foundUser.id } }),
+      this.taskRepository.count({ where: { user_id: foundUser.id, status: 'in-progress' } }),
+      this.taskRepository.count({ where: { user_id: foundUser.id, status: 'completed' } }),
+      this.workspaceMembershipRepository.find({
+        where: { email: foundUser.email, status: 'accepted' },
+        relations: ['workspace'],
+      }),
+    ]);
+
+    // Extract workspace names from memberships
+    const workspaceNames = workspaceMemberships.map(membership => membership.workspace.workspace_name);
+
+    return createResponse(true, 'User profile retrieved successfully', {
+      user: {
+        id: foundUser.id,
+        email: foundUser.email,
+        username: foundUser.username,
+        displayPic: foundUser.displayPic,
+      },
+      overview: {
+        totalTasks,
+        tasksInProgress,
+        completedTasks,
+      },
+      workspaces: workspaceNames
     });
   }
 }

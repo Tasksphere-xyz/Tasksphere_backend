@@ -1,4 +1,5 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+/* eslint-disable prettier/prettier */
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkspaceService } from './workspace.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -48,5 +49,26 @@ export class WorkspaceController {
       inviteUserDto,
       user,
     );
+  }
+
+  @Get('all')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'List of workspaces retrieved successfully' })
+  async getAllWorkspaces(@Req() req: Request & { user: UserPayload }) {
+    const user = req.user;
+    return await this.workspaceService.getAllUserWorkspaces(user);
+  }
+
+  @Post(':workspaceId/join')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'User successfully joined the workspace' })
+  @ApiResponse({ status: 400, description: 'Invalid invitation or workspace does not exist' })
+  @ApiParam({ name: 'workspaceId', description: 'ID of the workspace' })
+  async joinWorkspace(
+    @Param('workspaceId') workspaceId: string,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const user = req.user;
+    return await this.workspaceService.joinWorkspace(Number(workspaceId), user);
   }
 }
