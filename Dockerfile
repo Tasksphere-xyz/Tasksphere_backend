@@ -14,7 +14,7 @@ RUN npm ci
 COPY . .
 
 # Build the NestJS application
-RUN npm run build --production
+RUN npm run build
 
 
 # Use a smaller Node.js runtime for the production environment
@@ -23,17 +23,14 @@ FROM node:18-slim AS production
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Use a non-root user for security
-USER node
-
 # Copy only the production node_modules from the build stage
-COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/node_modules ./node_modules
 
 # Copy the built application from the build stage
-COPY --chown=node:node --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/dist ./dist
 
-# Create the uploads directory explicitly and set permissions
-RUN mkdir -p /usr/src/app/uploads && chown -R node:node /usr/src/app/uploads
+# Create the uploads directory explicitly
+RUN mkdir -p /usr/src/app/uploads
 
 # Expose the application port
 EXPOSE 3000
