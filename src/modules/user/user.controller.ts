@@ -1,3 +1,5 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-inferrable-types */
 import {
   Controller,
   Body,
@@ -6,9 +8,9 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  UnauthorizedException,
+  Get
 } from '@nestjs/common';
-import { ApiConsumes, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPayload } from 'express';
@@ -46,5 +48,13 @@ export class UserController {
       user,
       filePath,
     );
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  async getUserProfile(@Req() req: Request & { user: UserPayload }) {
+    const user = req.user;
+    return await this.userService.getUserProfile(user);
   }
 }
