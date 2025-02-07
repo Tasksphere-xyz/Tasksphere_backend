@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectMembership } from 'src/entities/project-membership.entity';
@@ -19,5 +20,6 @@ import { EmailService } from 'src/common/email/email.service';
   ],
   controllers: [WorkspaceController],
   providers: [WorkspaceService, EmailService],
+  exports: [TypeOrmModule],
 })
 export class WorkspaceModule {}

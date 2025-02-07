@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Module } from '@nestjs/common';
 import { TaskController } from './task.controller';
 import { TaskService } from './task.service';
@@ -12,5 +13,6 @@ import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
   ],
   controllers: [TaskController],
   providers: [TaskService, CloudinaryProvider],
+  exports: [TypeOrmModule],
 })
 export class TaskModule {}
