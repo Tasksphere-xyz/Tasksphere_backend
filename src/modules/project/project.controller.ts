@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   Body,
   Controller,
@@ -70,5 +71,18 @@ export class ProjectController {
   ) {
     const user = req.user
     return this.projectService.getProjectMembers(projectId, user, page);
+  }
+
+  @Post(':projectId/join')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'User successfully joined the project' })
+  @ApiResponse({ status: 400, description: 'Invalid invitation or project does not exist' })
+  @ApiParam({ name: 'projectId', description: 'ID of the project' })
+  async joinProject(
+    @Param('projectId') projectId: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const user = req.user;
+    return await this.projectService.joinProject(projectId, user);
   }
 }

@@ -1,3 +1,5 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-inferrable-types */
 import {
   BadRequestException,
   ForbiddenException,
@@ -158,6 +160,33 @@ export class ProjectService {
       members,
       totalPages: totalPages === 0 ? 1 : totalPages,
       currentPage: page,
+    });
+  }
+
+  async joinProject(project_id: number, user: UserPayload) {
+    const project = await this.projectRepository.findOne({
+      where: { id: project_id },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const invitation = await this.checkProjectMembership(
+      project_id,
+      user.email,
+      'pending',
+    );
+
+    if (!invitation) {
+      throw new ForbiddenException('You are not invited to this project');
+    }
+
+    invitation.status = 'accepted';
+    await this.projectMembershipRepository.save(invitation);
+
+    return createResponse(true, 'Successfully joined the project', {
+      project,
     });
   }
 }
