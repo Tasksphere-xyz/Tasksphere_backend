@@ -1,0 +1,23 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ProjectMembership } from 'src/entities/project-membership.entity';
+import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
+import { Workspace } from 'src/entities/workspace.entity';
+import { WorkspaceController } from './workspace.controller';
+import { WorkspaceService } from './workspace.service';
+import { User } from 'src/entities/user.entity';
+import { EmailService } from 'src/common/email/email.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      ProjectMembership,
+      Workspace,
+      WorkspaceMembership,
+      User
+    ]),
+  ],
+  controllers: [WorkspaceController],
+  providers: [WorkspaceService, EmailService],
+})
+export class WorkspaceModule {}
