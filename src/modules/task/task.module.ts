@@ -6,11 +6,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Task } from 'src/entities/task.entity';
 import { User } from 'src/entities/user.entity';
 import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
+import { Activity } from 'src/entities/activity.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Task, User]),
-  ],
+  imports: [TypeOrmModule.forFeature([Task, User, Activity])],
   controllers: [TaskController],
   providers: [TaskService, CloudinaryProvider],
   exports: [TypeOrmModule],

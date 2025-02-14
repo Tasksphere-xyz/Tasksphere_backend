@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPayload } from 'express';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +11,8 @@ import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
 import { unlinkSavedFile } from 'src/utils/unlinkImage.util';
 import { UploadApiResponse } from 'cloudinary';
 import { createResponse } from 'src/common/dto/response.dto';
+import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { Activity } from 'src/entities/activity.entity';
 
 @Injectable()
 export class TaskService {
@@ -19,6 +21,8 @@ export class TaskService {
     private taskRepository: Repository<Task>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Activity)
+    private activityRepository: Repository<Activity>,
     private readonly cloudinaryProvider: CloudinaryProvider,
   ) {}
 
@@ -28,10 +32,35 @@ export class TaskService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new NotFoundException('User not found');
     }
 
     return user;
+  }
+
+  public async findTaskById(id: number): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id } });
+
+    if (!task) {
+      throw new NotFoundException(`Task not found`);
+    }
+
+    return task;
+  }
+
+  public async createActivity(
+    user_id: number,
+    task_id: number,
+    action: 'status-change' | 'assignment',
+    activity: string,
+  ): Promise<void> {
+    const newActivity = this.activityRepository.create({
+      user_id,
+      task_id,
+      action,
+      activity,
+    });
+    await this.activityRepository.save(newActivity);
   }
 
   async createTask(
@@ -84,6 +113,81 @@ export class TaskService {
 
     return createResponse(true, 'Task created successfully', {
       newTask,
+    });
+  }
+
+  async updateTaskStatus(id: number, updateTaskStatusDto: UpdateTaskStatusDto) {
+    const task = await this.findTaskById(id);
+
+    task.status = updateTaskStatusDto.status;
+    await this.taskRepository.save(task);
+
+    await this.createActivity(
+      task.assigned_to,
+      task.id,
+      'status-change',
+      `Task status changed to to '${task.status}'`,
+    );
+
+    return createResponse(true, 'Task status updated successfully', {
+      task,
+    });
+  }
+
+  async getAllTasks(
+    page: number = 1,
+    assignedTo?: string,
+    sortBy?: 'newest' | 'oldest' | 'due-date' | 'last-updated',
+    status?: 'pending' | 'in-progress' | 'completed',
+    priority?: 'low' | 'medium' | 'high' | 'urgent',
+  ) {
+    page = page > 0 ? page : 1;
+    const limit = 10;
+
+    const skip = (page - 1) * limit;
+
+    const query = this.taskRepository.createQueryBuilder('task');
+
+    if (assignedTo) {
+      query.andWhere('task.assigned_to = :assignedTo', { assignedTo });
+    }
+
+    if (status) {
+      query.andWhere('task.status = :status', { status });
+    }
+
+    if (priority) {
+      query.andWhere('task.priority = :priority', { priority });
+    }
+
+    switch (sortBy) {
+      case 'newest':
+        query.orderBy('task.createdAt', 'DESC');
+        break;
+      case 'oldest':
+        query.orderBy('task.createdAt', 'ASC');
+        break;
+      case 'due-date':
+        query.orderBy('task.due_date', 'ASC');
+        break;
+      case 'last-updated':
+        query.orderBy('task.updatedAt', 'DESC');
+        break;
+    }
+
+    query.skip(skip).take(limit);
+
+    const [tasks, total] = await query.getManyAndCount();
+
+    const totalPages = Math.ceil(total / limit);
+
+    const message =
+      tasks.length === 0 ? 'No task found' : 'Tasks retrieved successfully';
+
+    return createResponse(true, message, {
+      tasks,
+      totalPages: totalPages === 0 ? 1 : totalPages,
+      currentPage: page,
     });
   }
 }

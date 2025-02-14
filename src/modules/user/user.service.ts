@@ -12,6 +12,7 @@ import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
 import { unlinkSavedFile } from 'src/utils/unlinkImage.util';
 import { Task } from 'src/entities/task.entity';
 import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
+import { Activity } from 'src/entities/activity.entity';
 
 @Injectable()
 export class UserService {
@@ -22,6 +23,8 @@ export class UserService {
     private taskRepository: Repository<Task>,
     @InjectRepository(WorkspaceMembership)
     private workspaceMembershipRepository: Repository<WorkspaceMembership>,
+    @InjectRepository(Activity)
+    private activityRepository: Repository<Activity>,
     private readonly cloudinaryProvider: CloudinaryProvider,
   ) {}
 
@@ -89,18 +92,25 @@ export class UserService {
     const foundUser = await this.findUserByEmail(user.email);
 
     // Fetch user's tasks overview
-    const [totalTasks, tasksInProgress, completedTasks, workspaceMemberships] = await Promise.all([
-      this.taskRepository.count({ where: { user_id: foundUser.id } }),
-      this.taskRepository.count({ where: { user_id: foundUser.id, status: 'in-progress' } }),
-      this.taskRepository.count({ where: { user_id: foundUser.id, status: 'completed' } }),
-      this.workspaceMembershipRepository.find({
-        where: { email: foundUser.email, status: 'accepted' },
-        relations: ['workspace'],
-      }),
-    ]);
+    const [totalTasks, tasksInProgress, completedTasks, workspaceMemberships] =
+      await Promise.all([
+        this.taskRepository.count({ where: { user_id: foundUser.id } }),
+        this.taskRepository.count({
+          where: { user_id: foundUser.id, status: 'in-progress' },
+        }),
+        this.taskRepository.count({
+          where: { user_id: foundUser.id, status: 'completed' },
+        }),
+        this.workspaceMembershipRepository.find({
+          where: { email: foundUser.email, status: 'accepted' },
+          relations: ['workspace'],
+        }),
+      ]);
 
     // Extract workspace names from memberships
-    const workspaceNames = workspaceMemberships.map(membership => membership.workspace.workspace_name);
+    const workspaceNames = workspaceMemberships.map(
+      (membership) => membership.workspace.workspace_name,
+    );
 
     return createResponse(true, 'User profile retrieved successfully', {
       user: {
@@ -114,7 +124,36 @@ export class UserService {
         tasksInProgress,
         completedTasks,
       },
-      workspaces: workspaceNames
+      workspaces: workspaceNames,
+    });
+  }
+
+  async getUserActivities(user: UserPayload, page: number = 1) {
+    page = page > 0 ? page : 1;
+    const limit = 8;
+
+    const skip = (page - 1) * limit;
+
+    const foundUser = await this.findUserByEmail(user.email);
+
+    const [activities, total] = await this.activityRepository.findAndCount({
+      where: { user_id: foundUser.id },
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    const message =
+      activities.length === 0
+        ? 'No activity found'
+        : 'Activities retrieved successfully';
+
+    return createResponse(true, message, {
+      activities,
+      totalPages: totalPages === 0 ? 1 : totalPages,
+      currentPage: page,
     });
   }
 }

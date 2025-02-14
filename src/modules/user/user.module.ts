@@ -5,12 +5,13 @@ import { UserController } from './user.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
 import { TaskModule } from '../task/task.module';
-import { WorkspaceModule } from '../workspace/workspace.module'; 
+import { WorkspaceModule } from '../workspace/workspace.module';
 import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
+import { Activity } from 'src/entities/activity.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Activity]),
     TaskModule,
     WorkspaceModule,
   ],

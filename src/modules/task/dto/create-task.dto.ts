@@ -22,10 +22,10 @@ export class CreateTaskDto {
   @IsEnum(['low', 'medium', 'high', 'urgent'])
   priority: 'low' | 'medium' | 'high' | 'urgent';
 
-  @ApiProperty({ description: 'User assigned to the task', required: false })
+  @ApiProperty({ description: 'Id of user assigned to the task', required: false })
   @IsOptional()
   @IsString()
-  assigned_to?: string;
+  assigned_to?: number;
 
   @ApiProperty({
     description: 'Attachment file',

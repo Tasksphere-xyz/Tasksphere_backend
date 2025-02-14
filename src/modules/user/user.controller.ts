@@ -8,9 +8,10 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  Get
+  Get,
+  Query,
 } from '@nestjs/common';
-import { ApiConsumes, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPayload } from 'express';
@@ -52,9 +53,32 @@ export class UserController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+  })
   async getUserProfile(@Req() req: Request & { user: UserPayload }) {
     const user = req.user;
     return await this.userService.getUserProfile(user);
+  }
+
+  @Get('activities')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Activities retrieved successfully',
+  })
+  @ApiResponse({ status: 400, description: 'User not found' })
+  @ApiQuery({
+    name: 'page',
+    required: true,
+    description: 'Page number for pagination',
+  })
+  async getUserActivities(
+    @Query('page') page: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const user = req.user;
+    return await this.userService.getUserActivities(user, page);
   }
 }
