@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-inferrable-types */
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { UserPayload } from 'express';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -116,6 +118,74 @@ export class TaskService {
     });
   }
 
+  async getTaskById(taskId: number) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+    });
+  
+    if (!task) {
+      throw new BadRequestException('Task not found');
+    }
+  
+    return createResponse(true, 'Task retrieved successfully', { task });
+  }
+  
+  async updateTask(
+    taskId: number,
+    updateData: Partial<CreateTaskDto>,
+  ) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId},
+    });
+  
+    if (!task) {
+      throw new BadRequestException('Task not found');
+    }
+  
+    Object.assign(task, updateData);
+    await this.taskRepository.save(task);
+  
+    return createResponse(true, 'Task updated successfully', { task });
+  }
+  
+  async deleteTask(taskId: number) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+    });
+  
+    if (!task) {
+      throw new BadRequestException('Task not found');
+    }
+  
+    await this.taskRepository.delete(taskId);
+    return createResponse(true, 'Task deleted successfully', {});
+  }
+  
+  async duplicateTask(user: UserPayload, taskId: number) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId},
+    });
+
+    if (!task) {
+      throw new UnauthorizedException('Task not found');
+    }
+  
+    const foundUser = await this.findUserByEmail(user.email);
+
+    const newTask = this.taskRepository.create({
+      ...task,
+      id: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+      user_id: foundUser.id,
+      status: 'pending',
+      title: `${task.title} (Copy)`,
+    });
+  
+    await this.taskRepository.save(newTask);
+    return createResponse(true, 'Task duplicated successfully', { newTask });
+  }
+  
   async updateTaskStatus(id: number, updateTaskStatusDto: UpdateTaskStatusDto) {
     const task = await this.findTaskById(id);
 
@@ -126,7 +196,7 @@ export class TaskService {
       task.assigned_to,
       task.id,
       'status-change',
-      `Task status changed to to '${task.status}'`,
+      `Task status changed to '${task.status}'`,
     );
 
     return createResponse(true, 'Task status updated successfully', {

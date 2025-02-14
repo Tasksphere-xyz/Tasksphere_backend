@@ -1,6 +1,9 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-inferrable-types */
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -49,6 +52,40 @@ export class TaskController {
       filePath = file.path;
     }
     return await this.taskService.createTask(user, createTaskDto, filePath);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Task retrieved successfully' })
+  async getTask(@Param('id') id: number) {
+    return await this.taskService.getTaskById(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Task updated successfully' })
+  async updateTask(
+    @Param('id') id: number,
+    @Body() updateData: Partial<CreateTaskDto>,
+  ) {
+    return await this.taskService.updateTask(id, updateData);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Task deleted successfully' })
+  async deleteTask(@Param('id') id: number) {
+    return await this.taskService.deleteTask(id);
+  }
+
+  @Post(':id/duplicate')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Task duplicated successfully' })
+  async duplicateTask(
+    @Req() req: Request & { user: UserPayload },
+    @Param('id') id: number,
+  ) {
+    return await this.taskService.duplicateTask(req.user, id);
   }
 
   @Patch('status/:id')
