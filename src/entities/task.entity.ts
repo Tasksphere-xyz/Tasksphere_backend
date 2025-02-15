@@ -25,7 +25,7 @@ import {
     priority: 'low' | 'medium' | 'high' | 'urgent';
   
     @Column({ nullable: true })
-    assigned_to?: string;
+    assigned_to?: number;
 
     @Column({ nullable: true })
     attachment?: string;
