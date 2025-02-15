@@ -6,7 +6,6 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from 'src/entities/task.entity';
 import { Repository } from 'typeorm';
-import { User } from 'src/entities/user.entity';
 import * as path from 'path';
 import * as fs from 'fs';
 import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
@@ -15,30 +14,18 @@ import { UploadApiResponse } from 'cloudinary';
 import { createResponse } from 'src/common/dto/response.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { Activity } from 'src/entities/activity.entity';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class TaskService {
   constructor(
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     @InjectRepository(Activity)
     private activityRepository: Repository<Activity>,
     private readonly cloudinaryProvider: CloudinaryProvider,
+    private readonly userService: UserService,
   ) {}
-
-  public async findUserByEmail(email: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
-  }
 
   public async findTaskById(id: number): Promise<Task> {
     const task = await this.taskRepository.findOne({ where: { id } });
@@ -50,7 +37,7 @@ export class TaskService {
     return task;
   }
 
-  public async createActivity(
+  private async createActivity(
     user_id: number,
     task_id: number,
     action: 'status-change' | 'assignment',
@@ -65,14 +52,14 @@ export class TaskService {
     await this.activityRepository.save(newActivity);
   }
 
-  async createTask(
+  public async createTask(
     user: UserPayload,
     createTaskDto: CreateTaskDto,
     filePath: string,
   ) {
     const { title, priority, assigned_to, start_date, due_date } =
       createTaskDto;
-    const foundUser = await this.findUserByEmail(user.email);
+    const foundUser = await this.userService.findUserByEmail(user.email);
     let attachmentUrl: string = '';
 
     if (filePath) {
@@ -118,19 +105,28 @@ export class TaskService {
     });
   }
 
-  async getTaskById(taskId: number) {
-    const task = await this.taskRepository.findOne({
-      where: { id: taskId },
-    });
+  public async getTaskById(taskId: number) {
+    const task = await this.taskRepository.findOne({ where: { id: taskId } });
   
     if (!task) {
       throw new BadRequestException('Task not found');
     }
   
-    return createResponse(true, 'Task retrieved successfully', { task });
+    const creator = await this.userService.findUserById(task.user_id);
+    let assignee = null;
+  
+    if (task.assigned_to) {
+      assignee = await this.userService.findUserById(Number(task.assigned_to));
+    }
+  
+    return createResponse(true, 'Task retrieved successfully', { 
+      ...task,
+      creator,
+      assignee
+    });
   }
   
-  async updateTask(
+  public async updateTask(
     taskId: number,
     updateData: Partial<CreateTaskDto>,
   ) {
@@ -148,7 +144,7 @@ export class TaskService {
     return createResponse(true, 'Task updated successfully', { task });
   }
   
-  async deleteTask(taskId: number) {
+  public async deleteTask(taskId: number) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
     });
@@ -161,7 +157,7 @@ export class TaskService {
     return createResponse(true, 'Task deleted successfully', {});
   }
   
-  async duplicateTask(user: UserPayload, taskId: number) {
+  public async duplicateTask(user: UserPayload, taskId: number) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId},
     });
@@ -170,7 +166,7 @@ export class TaskService {
       throw new UnauthorizedException('Task not found');
     }
   
-    const foundUser = await this.findUserByEmail(user.email);
+    const foundUser = await this.userService.findUserByEmail(user.email);
 
     const newTask = this.taskRepository.create({
       ...task,
@@ -186,7 +182,7 @@ export class TaskService {
     return createResponse(true, 'Task duplicated successfully', { newTask });
   }
   
-  async updateTaskStatus(id: number, updateTaskStatusDto: UpdateTaskStatusDto) {
+  public async updateTaskStatus(id: number, updateTaskStatusDto: UpdateTaskStatusDto) {
     const task = await this.findTaskById(id);
 
     task.status = updateTaskStatusDto.status;
@@ -204,9 +200,9 @@ export class TaskService {
     });
   }
 
-  async getAllTasks(
+  public async getAllTasks(
     page: number = 1,
-    assignedTo?: string,
+    assignedTo?: number,
     sortBy?: 'newest' | 'oldest' | 'due-date' | 'last-updated',
     status?: 'pending' | 'in-progress' | 'completed',
     priority?: 'low' | 'medium' | 'high' | 'urgent',
@@ -249,14 +245,77 @@ export class TaskService {
 
     const [tasks, total] = await query.getManyAndCount();
 
+    const enhancedTasks = await Promise.all(
+      tasks.map(async (task) => ({
+        ...task,
+        creator: await this.userService.findUserById(task.user_id),
+        assignee: task.assigned_to ? await this.userService.findUserById(task.assigned_to) : null,
+      }))
+    );
+
     const totalPages = Math.ceil(total / limit);
 
     const message =
       tasks.length === 0 ? 'No task found' : 'Tasks retrieved successfully';
 
     return createResponse(true, message, {
-      tasks,
+      tasks: enhancedTasks,
       totalPages: totalPages === 0 ? 1 : totalPages,
+      currentPage: page,
+    });
+  }
+
+  public async getAllTaskHistory(
+    page: number = 1,
+    assignedTo?: number,
+    action?: 'status-change' | 'assignment',
+    from?: string,
+    to?: string
+  ) {
+    page = Number(page) > 0 ? Number(page) : 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+  
+    const query = this.activityRepository.createQueryBuilder('task_activity');
+  
+    if (assignedTo !== undefined && assignedTo !== null) {
+      query.andWhere('task_activity.user_id = :assignedTo', { assignedTo });
+    }
+  
+    if (action) {
+      query.andWhere('task_activity.action = :action', { action });
+    }
+  
+    if (from && to) {
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      
+      if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
+        query.andWhere('task_activity.createdAt BETWEEN :from AND :to', {
+          from: fromDate.toISOString(),
+          to: toDate.toISOString(),
+        });
+      }
+    }
+  
+    query.orderBy('task_activity.createdAt', 'DESC');
+  
+    query.skip(skip).take(limit);
+  
+    const [activities, total] = await query.getManyAndCount();
+  
+    const enhancedActivity = await Promise.all(
+      activities.map(async (activity) => ({
+        ...activity,
+        creator: await this.userService.findUserById(activity.user_id),
+      }))
+    );
+  
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+  
+    return createResponse(true, activities.length === 0 ? 'No History found' : 'History retrieved successfully', {
+      history: enhancedActivity,
+      totalPages,
       currentPage: page,
     });
   }

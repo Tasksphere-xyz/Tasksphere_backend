@@ -112,8 +112,8 @@ export class TaskController {
   @ApiQuery({
     name: 'assignedTo',
     required: false,
-    type: String,
-    description: 'User ID or name of the assigned user',
+    type: Number,
+    description: 'User ID of the assigned user',
   })
   @ApiQuery({
     name: 'sortBy',
@@ -135,7 +135,7 @@ export class TaskController {
   })
   async getAllTasks(
     @Query('page') page: number,
-    @Query('assignedTo') assignedTo?: string,
+    @Query('assignedTo') assignedTo?: number,
     @Query('sortBy')
     sortBy: 'newest' | 'oldest' | 'due-date' | 'last-updated' = 'newest',
     @Query('status') status?: 'pending' | 'in-progress' | 'completed',
@@ -148,5 +148,48 @@ export class TaskController {
       status,
       priority,
     );
+  }
+
+  @Get('/history')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Task history retrieved successfully' })
+  @ApiQuery({ 
+    name: 'page', 
+    required: true, 
+    type: Number, 
+    description: 'Page number for pagination' 
+  })
+  @ApiQuery({ 
+    name: 'assignedTo', 
+    required: false, 
+    type: Number, 
+    description: 'User ID of the assigned user'
+   })
+  @ApiQuery({ 
+    name: 'action', 
+    required: false, 
+    enum: ['status-change', 'assignment'], 
+    description: 'Filter by action type' 
+  })
+  @ApiQuery({ 
+    name: 'from', 
+    required: false, 
+    type: String, 
+    description: 'Start date (YYYY-MM-DD)'
+  })
+  @ApiQuery({ 
+    name: 'to', 
+    required: false, 
+    type: String, 
+    description: 'End date (YYYY-MM-DD)'
+  })
+  async getTaskHistory(
+    @Query('page') page: number,
+    @Query('assignedTo') assignedTo?: number,
+    @Query('action') action?: 'status-change' | 'assignment',
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    return this.taskService.getAllTaskHistory(page, assignedTo, action, from, to);
   }
 }
