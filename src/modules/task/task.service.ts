@@ -1,6 +1,11 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-inferrable-types */
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UserPayload } from 'express';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +20,8 @@ import { createResponse } from 'src/common/dto/response.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { Activity } from 'src/entities/activity.entity';
 import { UserService } from '../user/user.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from 'src/entities/notification.entity';
 
 @Injectable()
 export class TaskService {
@@ -25,6 +32,7 @@ export class TaskService {
     private activityRepository: Repository<Activity>,
     private readonly cloudinaryProvider: CloudinaryProvider,
     private readonly userService: UserService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   public async findTaskById(id: number): Promise<Task> {
@@ -50,6 +58,14 @@ export class TaskService {
       activity,
     });
     await this.activityRepository.save(newActivity);
+  }
+
+  private formatDate(date: Date) {
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    return formattedDate;
   }
 
   public async createTask(
@@ -100,6 +116,19 @@ export class TaskService {
 
     await this.taskRepository.save(newTask);
 
+    if (assigned_to) {
+      const assignedUser = await this.userService.findUserById(assigned_to);
+
+      await this.notificationService.sendNotification(
+        [assignedUser.email],
+        NotificationType.ASSIGNED_TASK,
+        'New Task Assigned',
+        `Complete '${title}' ${
+          due_date ? `by ${this.formatDate(due_date)}` : ''
+        }`,
+      );
+    }
+
     return createResponse(true, 'Task created successfully', {
       newTask,
     });
@@ -107,65 +136,62 @@ export class TaskService {
 
   public async getTaskById(taskId: number) {
     const task = await this.taskRepository.findOne({ where: { id: taskId } });
-  
+
     if (!task) {
       throw new BadRequestException('Task not found');
     }
-  
+
     const creator = await this.userService.findUserById(task.user_id);
     let assignee = null;
-  
+
     if (task.assigned_to) {
       assignee = await this.userService.findUserById(Number(task.assigned_to));
     }
-  
-    return createResponse(true, 'Task retrieved successfully', { 
+
+    return createResponse(true, 'Task retrieved successfully', {
       ...task,
       creator,
-      assignee
+      assignee,
     });
   }
-  
-  public async updateTask(
-    taskId: number,
-    updateData: Partial<CreateTaskDto>,
-  ) {
+
+  public async updateTask(taskId: number, updateData: Partial<CreateTaskDto>) {
     const task = await this.taskRepository.findOne({
-      where: { id: taskId},
+      where: { id: taskId },
     });
-  
+
     if (!task) {
       throw new BadRequestException('Task not found');
     }
-  
+
     Object.assign(task, updateData);
     await this.taskRepository.save(task);
-  
+
     return createResponse(true, 'Task updated successfully', { task });
   }
-  
+
   public async deleteTask(taskId: number) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
     });
-  
+
     if (!task) {
       throw new BadRequestException('Task not found');
     }
-  
+
     await this.taskRepository.delete(taskId);
     return createResponse(true, 'Task deleted successfully', {});
   }
-  
+
   public async duplicateTask(user: UserPayload, taskId: number) {
     const task = await this.taskRepository.findOne({
-      where: { id: taskId},
+      where: { id: taskId },
     });
 
     if (!task) {
       throw new UnauthorizedException('Task not found');
     }
-  
+
     const foundUser = await this.userService.findUserByEmail(user.email);
 
     const newTask = this.taskRepository.create({
@@ -177,12 +203,15 @@ export class TaskService {
       status: 'pending',
       title: `${task.title} (Copy)`,
     });
-  
+
     await this.taskRepository.save(newTask);
     return createResponse(true, 'Task duplicated successfully', { newTask });
   }
-  
-  public async updateTaskStatus(id: number, updateTaskStatusDto: UpdateTaskStatusDto) {
+
+  public async updateTaskStatus(
+    id: number,
+    updateTaskStatusDto: UpdateTaskStatusDto,
+  ) {
     const task = await this.findTaskById(id);
 
     task.status = updateTaskStatusDto.status;
@@ -249,8 +278,10 @@ export class TaskService {
       tasks.map(async (task) => ({
         ...task,
         creator: await this.userService.findUserById(task.user_id),
-        assignee: task.assigned_to ? await this.userService.findUserById(task.assigned_to) : null,
-      }))
+        assignee: task.assigned_to
+          ? await this.userService.findUserById(task.assigned_to)
+          : null,
+      })),
     );
 
     const totalPages = Math.ceil(total / limit);
@@ -270,26 +301,26 @@ export class TaskService {
     assignedTo?: number,
     action?: 'status-change' | 'assignment',
     from?: string,
-    to?: string
+    to?: string,
   ) {
     page = Number(page) > 0 ? Number(page) : 1;
     const limit = 10;
     const skip = (page - 1) * limit;
-  
+
     const query = this.activityRepository.createQueryBuilder('task_activity');
-  
+
     if (assignedTo !== undefined && assignedTo !== null) {
       query.andWhere('task_activity.user_id = :assignedTo', { assignedTo });
     }
-  
+
     if (action) {
       query.andWhere('task_activity.action = :action', { action });
     }
-  
+
     if (from && to) {
       const fromDate = new Date(from);
       const toDate = new Date(to);
-      
+
       if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
         query.andWhere('task_activity.createdAt BETWEEN :from AND :to', {
           from: fromDate.toISOString(),
@@ -297,26 +328,32 @@ export class TaskService {
         });
       }
     }
-  
+
     query.orderBy('task_activity.createdAt', 'DESC');
-  
+
     query.skip(skip).take(limit);
-  
+
     const [activities, total] = await query.getManyAndCount();
-  
+
     const enhancedActivity = await Promise.all(
       activities.map(async (activity) => ({
         ...activity,
         creator: await this.userService.findUserById(activity.user_id),
-      }))
+      })),
     );
-  
+
     const totalPages = Math.max(1, Math.ceil(total / limit));
-  
-    return createResponse(true, activities.length === 0 ? 'No History found' : 'History retrieved successfully', {
-      history: enhancedActivity,
-      totalPages,
-      currentPage: page,
-    });
+
+    return createResponse(
+      true,
+      activities.length === 0
+        ? 'No History found'
+        : 'History retrieved successfully',
+      {
+        history: enhancedActivity,
+        totalPages,
+        currentPage: page,
+      },
+    );
   }
 }

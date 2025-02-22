@@ -8,11 +8,13 @@ import { User } from 'src/entities/user.entity';
 import { CloudinaryProvider } from 'src/providers/cloudinary.provider';
 import { Activity } from 'src/entities/activity.entity';
 import { UserModule } from '../user/user.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Task, User, Activity]),
     forwardRef(() => UserModule),
+    NotificationModule,
   ],
   controllers: [TaskController],
   providers: [TaskService, CloudinaryProvider],
