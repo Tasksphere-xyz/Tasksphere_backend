@@ -15,7 +15,8 @@ import { Task } from 'src/entities/task.entity';
   imports: [
     TypeOrmModule.forFeature([User, Activity, WorkspaceMembership, Task]),
     forwardRef(() => TaskModule),
-    WorkspaceModule,
+    forwardRef(() =>  WorkspaceModule)
+   ,
   ],
   controllers: [UserController],
   providers: [UserService, CloudinaryProvider],

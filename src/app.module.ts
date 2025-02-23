@@ -6,6 +6,8 @@ import { UserModule } from './modules/user/user.module';
 import { ProjectModule } from './modules/project/project.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { TaskModule } from './modules/task/task.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { CommentModule } from './modules/comment/comment.module';
 dotenv.config();
 @Module({
   imports: [
@@ -28,7 +30,9 @@ dotenv.config();
     UserModule,
     ProjectModule,
     WorkspaceModule,
-    TaskModule
+    TaskModule,
+    NotificationModule,
+    CommentModule,
   ],
 })
 export class AppModule {}

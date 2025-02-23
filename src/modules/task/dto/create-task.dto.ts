@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsDate,
   IsNotEmpty,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -24,7 +25,7 @@ export class CreateTaskDto {
 
   @ApiProperty({ description: 'Id of user assigned to the task', required: false })
   @IsOptional()
-  @IsString()
+  @IsNumber()
   assigned_to?: number;
 
   @ApiProperty({
