@@ -79,24 +79,28 @@ import { SendMessageDto } from './dto/send-message.dto';
         .where('chat.sender_email = :email OR chat.receiver_email = :email', { email: user_email })
         .orderBy('chat.createdAt', 'DESC')
         .getMany();
-  
+    
       const chatMap = new Map();
-  
+    
       chats.forEach(chat => {
         const otherUser = chat.sender_email === user_email ? chat.receiver_email : chat.sender_email;
+    
         if (!chatMap.has(otherUser)) {
           chatMap.set(otherUser, {
             email: otherUser,
             lastMessage: chat.message || 'File attachment',
+            lastMessageTime: chat.createdAt,
             unreadCount: 0,
           });
         }
+    
         if (!chat.is_read && chat.receiver_email === user_email) {
           chatMap.get(otherUser).unreadCount += 1;
         }
       });
-  
+    
       return createResponse(true, 'Chat list retrieved successfully', { chats: Array.from(chatMap.values()) });
     }
+    
   }
   
