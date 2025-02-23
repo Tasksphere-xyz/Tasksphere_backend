@@ -8,6 +8,8 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { TaskModule } from './modules/task/task.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { CommentModule } from './modules/comment/comment.module';
+import { ChatModule } from './modules/chat/chat.module'
+
 dotenv.config();
 @Module({
   imports: [
@@ -33,6 +35,7 @@ dotenv.config();
     TaskModule,
     NotificationModule,
     CommentModule,
+    ChatModule
   ],
 })
 export class AppModule {}

@@ -26,6 +26,12 @@ async function bootstrap() {
     .setDescription('The api documentation for Tasksphere')
     .setVersion('1.0')
     .addTag('auth')
+    .addTag('project')
+    .addTag('task')
+    .addTag('task')
+    .addTag('chat')
+    .addTag('notification')
+    .addTag('comment')
     .addBearerAuth()
     .build();
 

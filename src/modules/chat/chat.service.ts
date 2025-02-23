@@ -9,6 +9,7 @@ import {
   import { ChatMessage } from 'src/entities/chat-message.entity';
   import { ProjectMembership } from 'src/entities/project-membership.entity';
   import { createResponse } from 'src/common/dto/response.dto';
+import { SendMessageDto } from './dto/send-message.dto';
   
   @Injectable()
   export class ChatService {
@@ -20,14 +21,10 @@ import {
       private projectMembershipRepository: Repository<ProjectMembership>,
     ) {}
   
-    async sendMessage(
-      sender_email: string,
-      receiver_email: string,
-      project_id: number,
-      message?: string,
-      fileUrl?: string,
-    ) {
-      // Verify both users are part of the same project
+    async sendMessage(sender_email: string, sendMessageDto: SendMessageDto) {
+      const { receiver_email, project_id, message, fileUrl } = sendMessageDto;
+  
+      // Ensure both users are in the same project
       const senderMembership = await this.projectMembershipRepository.findOne({
         where: { project_id, email: sender_email, status: 'accepted' },
       });

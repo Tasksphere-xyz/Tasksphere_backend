@@ -13,8 +13,9 @@ import { CreateCommentDto } from './dto/create-comment';
 import { CreateReplyDto } from './dto/create-reply';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { UserPayload } from 'express';
-import { ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('comment')
 @Controller('/comment')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
