@@ -16,6 +16,9 @@ import { createResponse } from 'src/common/dto/response.dto';
 import { InviteUserDto } from '../project/dto/invite-user.dto';
 // import { User } from 'src/entities/user.entity';
 import { EmailService } from 'src/common/email/email.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from 'src/entities/notification.entity';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class WorkspaceService {
@@ -26,10 +29,23 @@ export class WorkspaceService {
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(WorkspaceMembership)
     private workspaceMembershipRepository: Repository<WorkspaceMembership>,
-    // @InjectRepository(User)
-    // private userRepository: Repository<User>,
-    private emailService: EmailService,
+    private readonly emailService: EmailService,
+    private readonly notificationService: NotificationService,
+    private readonly userService: UserService,
   ) {}
+
+  private async getAllEmailOfMembersOfWorkspace(workspaceId: number) {
+    const members = await this.workspaceMembershipRepository.find({
+      where: { workspace_id: workspaceId, status: 'accepted' },
+    });
+
+    if (members.length === 0) {
+      return [];
+    } else {
+      const emails = members.map((member) => member.email);
+      return emails;
+    }
+  }
 
   async createWorkspace(
     createWorkspaceDto: CreateWorkspaceDto,
@@ -90,13 +106,6 @@ export class WorkspaceService {
     const invitedMembers: string[] = [];
 
     for (const email of emails) {
-      // Check if user exists
-      // const foundUser = await this.userRepository.findOne({ where: { email } });
-      // if (!foundUser) {
-      //   nonProjectMembers.push(email);
-      //   continue; // Skip to next email
-      // }
-
       // Check if user is already a member of the workspace
       const existingMembership =
         await this.workspaceMembershipRepository.findOne({
@@ -152,8 +161,7 @@ export class WorkspaceService {
     return createResponse(true, 'Workspaces retrieved successfully', {
       workspaces: userWorkspaces,
     });
-}
-
+  }
 
   async joinWorkspace(workspace_id: number, user: UserPayload) {
     const workspace = await this.workspaceRepository.findOne({
@@ -175,6 +183,20 @@ export class WorkspaceService {
     // Update the invitation status to accepted
     invitation.status = 'accepted';
     await this.workspaceMembershipRepository.save(invitation);
+
+    // send notigfication to user
+    const invitedUser = await this.userService.findUserByEmail(user.email);
+    const arrayOfEmail = await this.getAllEmailOfMembersOfWorkspace(
+      workspace_id,
+    );
+    if (arrayOfEmail.length > 0) {
+      await this.notificationService.sendNotification(
+        arrayOfEmail,
+        NotificationType.NEW_MEMBER,
+        'New Member Joined',
+        `${invitedUser.username} has joined the workspace: '${workspace.workspace_name}'`,
+      );
+    }
 
     return createResponse(true, 'Successfully joined the workspace', {
       workspace,
