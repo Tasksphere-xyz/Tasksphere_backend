@@ -2,25 +2,21 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
 
-export class SendMessageDto {
+export class SendWorkspaceMessageDto {
   @ApiProperty({ description: 'Sender email', example: 'me@example.com' })
   @IsString()
   @IsNotEmpty()
   sender_email: string;
 
-  @ApiProperty({ description: 'Receiver email', example: 'user@example.com' })
-  @IsString()
-  @IsNotEmpty()
-  receiver_email: string;
-
-  @ApiProperty({ description: 'Project ID', example: 1 })
+  @ApiProperty({ description: 'Workspace ID', example: 1 })
   @IsNumber()
   @IsNotEmpty()
-  project_id: number;
+  workspace_id: number;
 
   @ApiProperty({
-    description: 'Message content',
-    example: 'Hello there!',
+    description:
+      'Message content. Use mentions in the format @username(email@example.com)',
+    example: 'Hello @alice(alice@example.com), please review the document.',
     required: false,
   })
   @IsString()

@@ -11,11 +11,12 @@ import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UsePipes, ValidationPipe } from '@nestjs/common';
 import { ApiExtraModels, ApiTags } from '@nestjs/swagger';
+import { SendWorkspaceMessageDto } from './dto/send-workspace-message.dto';
 
-@ApiTags('WebSocket Chat')
+@ApiTags('WebSocket Workspace Chat')
 @ApiExtraModels(SendMessageDto)
 @WebSocketGateway({ cors: true })
-export class ChatGateway {
+export class ChatWorkspaceGateway {
   @WebSocketServer()
   server: Server;
 
@@ -31,32 +32,36 @@ export class ChatGateway {
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  // Listen for new messages from clients using DTO
-  @SubscribeMessage('sendMessage')
-  @UsePipes(new ValidationPipe()) // Ensures DTO validation
-  async handleSendMessage(
-    @MessageBody() data: Omit<SendMessageDto, 'sender_email'>, // Using DTO here
+  @SubscribeMessage('sendWorkspaceMessage')
+  @UsePipes(new ValidationPipe())
+  async handleSendWorkspaceMessage(
+    @MessageBody() data: Omit<SendWorkspaceMessageDto, 'sender_email'>,
     @ConnectedSocket() client: Socket,
   ) {
     const sender_email = client.handshake.auth.email;
-    const newMessage = await this.chatService.sendMessage(sender_email, {
-      ...data,
-      sender_email,
-    });
 
-    // Emit the new message to the receiver in real-time
-    this.server.to(data.receiver_email).emit('receiveMessage', newMessage);
+    const newMessage = await this.chatService.sendWorkspaceMessage(
+      sender_email,
+      { ...data, sender_email },
+    );
+
+    // Emit to all members of the workspace room
+    this.server
+      .to(`workspace_${data.workspace_id}`)
+      .emit('receiveWorkspaceMessage', newMessage);
 
     return newMessage;
   }
 
-  // Let users join their chat rooms
-  @SubscribeMessage('joinChat')
-  async handleJoinChat(
-    @MessageBody() email: string,
+  @SubscribeMessage('joinWorkspace')
+  async handleJoinWorkspace(
+    @MessageBody() workspace_id: number,
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(email); // User joins a room with their email
-    console.log(`User ${email} joined chat room`);
+    const user_email = client.handshake.auth.email;
+    await this.chatService.isUserInWorkspace(workspace_id, user_email);
+
+    client.join(`workspace_${workspace_id}`);
+    console.log(`User ${user_email} joined workspace ${workspace_id}`);
   }
 }
