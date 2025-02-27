@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Comment } from 'src/entities/comment.entity';
 import { Reply } from 'src/entities/reply.entity';
@@ -9,6 +13,7 @@ import { CreateReplyDto } from './dto/create-reply';
 import { createResponse } from 'src/common/dto/response.dto';
 import { UserService } from '../user/user.service';
 import { TaskService } from '../task/task.service';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class CommentService {
@@ -19,16 +24,33 @@ export class CommentService {
     private readonly replyRepository: Repository<Reply>,
     private readonly userService: UserService,
     private readonly taskService: TaskService,
+    private readonly chatService: ChatService,
   ) {}
 
   public async findCommentById(id: number): Promise<Comment> {
-    const comment = await this.commentRepository.findOne({ where: { id } });
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
 
     if (!comment) {
       throw new NotFoundException(`Comment not found`);
     }
 
     return comment;
+  }
+
+  public async findReplyById(id: number): Promise<Reply> {
+    const reply = await this.replyRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!reply) {
+      throw new NotFoundException('Reply not found');
+    }
+
+    return reply;
   }
 
   async createComment(
@@ -48,6 +70,12 @@ export class CommentService {
     });
 
     await this.commentRepository.save(comment);
+
+    await this.chatService.sendNotificationToMentionedUsers(
+      'comment',
+      content,
+      foundUser.username,
+    );
 
     return createResponse(true, 'comment created successfully', {
       comment,
@@ -70,6 +98,12 @@ export class CommentService {
       content,
     });
     await this.replyRepository.save(reply);
+
+    await this.chatService.sendNotificationToMentionedUsers(
+      'reply',
+      content,
+      foundUser.username,
+    );
 
     return createResponse(true, 'reply created successfully', {
       reply,
@@ -155,5 +189,28 @@ export class CommentService {
       totalPages: totalPages === 0 ? 1 : totalPages,
       currentPage: page,
     });
+  }
+
+  async deleteComment(id: number, user_email: string) {
+    const comment = await this.findCommentById(id);
+
+    if (comment.user.email !== user_email) {
+      throw new UnauthorizedException('You cannot delete this comment');
+    }
+
+    await this.commentRepository.delete(id);
+
+    return createResponse(true, 'Comment deleted successfully', {});
+  }
+
+  async deleteReply(id: number, user_email: string) {
+    const reply = await this.findReplyById(id);
+
+    if (reply.user.email !== user_email) {
+      throw new UnauthorizedException('You cannot delete this reply');
+    }
+
+    await this.replyRepository.delete(id);
+    return createResponse(true, 'Reply deleted successfully', {});
   }
 }

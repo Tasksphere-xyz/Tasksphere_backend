@@ -1,13 +1,12 @@
-/* eslint-disable prettier/prettier */
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
+  Column,
   CreateDateColumn,
 } from 'typeorm';
 
-@Entity('chat_messages')
-export class ChatMessage {
+@Entity('workspace_message')
+export class WorkspaceMessage {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -15,10 +14,7 @@ export class ChatMessage {
   sender_email: string;
 
   @Column()
-  receiver_email: string;
-
-  @Column()
-  project_id: number;
+  workspace_id: number;
 
   @Column({ type: 'text', nullable: true })
   message?: string;
@@ -26,9 +22,12 @@ export class ChatMessage {
   @Column({ nullable: true })
   fileUrl?: string;
 
-  @Column({ default: false })
-  is_read: boolean;
+  @Column({ nullable: false, default: false })
+  isPinned: boolean;
+
+  @Column({ nullable: true })
+  pinExpiresAt: Date;
 
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 }

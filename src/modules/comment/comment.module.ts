@@ -8,12 +8,14 @@ import { User } from 'src/entities/user.entity';
 import { Task } from 'src/entities/task.entity';
 import { TaskModule } from '../task/task.module';
 import { UserModule } from '../user/user.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Comment, User, Task, Reply]),
     TaskModule,
     UserModule,
+    ChatModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

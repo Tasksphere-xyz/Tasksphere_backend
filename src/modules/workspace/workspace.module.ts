@@ -24,6 +24,6 @@ import { UserModule } from '../user/user.module';
   ],
   controllers: [WorkspaceController],
   providers: [WorkspaceService, EmailService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, WorkspaceService],
 })
 export class WorkspaceModule {}

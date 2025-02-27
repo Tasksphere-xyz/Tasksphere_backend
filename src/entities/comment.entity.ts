@@ -11,7 +11,7 @@ import {
 import { Reply } from './reply.entity';
 import { User } from './user.entity';
 
-@Entity('Comment')
+@Entity('comment')
 export class Comment {
   @PrimaryGeneratedColumn()
   id: number;

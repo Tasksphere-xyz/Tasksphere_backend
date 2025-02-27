@@ -22,6 +22,7 @@ import { Activity } from 'src/entities/activity.entity';
 import { UserService } from '../user/user.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from 'src/entities/notification.entity';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class TaskService {
@@ -33,6 +34,7 @@ export class TaskService {
     private readonly cloudinaryProvider: CloudinaryProvider,
     private readonly userService: UserService,
     private readonly notificationService: NotificationService,
+    private readonly chatService: ChatService,
   ) {}
 
   public async findTaskById(id: number): Promise<Task> {
@@ -73,7 +75,7 @@ export class TaskService {
     createTaskDto: CreateTaskDto,
     filePath: string,
   ) {
-    const { title, priority, assigned_to, start_date, due_date } =
+    const { title, priority, description, assigned_to, start_date, due_date } =
       createTaskDto;
     const foundUser = await this.userService.findUserByEmail(user.email);
     let attachmentUrl: string = '';
@@ -108,6 +110,7 @@ export class TaskService {
       title,
       status: 'pending',
       priority,
+      description,
       assigned_to,
       attachment: attachmentUrl,
       start_date,
@@ -126,6 +129,14 @@ export class TaskService {
         `Complete '${title}' ${
           due_date ? `by ${this.formatDate(due_date)}` : ''
         }`,
+      );
+    }
+
+    if (description) {
+      await this.chatService.sendNotificationToMentionedUsers(
+        'task',
+        description,
+        foundUser.username,
       );
     }
 
