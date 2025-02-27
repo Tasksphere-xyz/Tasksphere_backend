@@ -22,12 +22,16 @@ import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SendWorkspaceMessageDto } from './dto/send-workspace-message.dto';
 import { UserPayload } from 'express';
+import { ChatCronService } from './chat-cron.service';
 
 @ApiTags('chat')
 @ApiBearerAuth()
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly chatCronService: ChatCronService,
+  ) {}
 
   @Post('send')
   @UseGuards(JwtAuthGuard)
@@ -96,18 +100,40 @@ export class ChatController {
     return await this.chatService.getWorkspaceMessages(workspace_id, email);
   }
 
-  @Patch('pin/:workspace_id')
+  @Patch('pin/:message_id')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Message pinned successfully' })
-  @ApiResponse({ status: 400, description: 'Messages not found' })
-  @ApiParam({ name: 'workspace_id', description: 'Project ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Message pin status updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Message not found' })
+  @ApiParam({ name: 'message_id', description: 'ID of the message' })
   @ApiQuery({ name: 'isPinned', description: 'Query to pin messages' })
+  @ApiQuery({
+    name: 'duration',
+    description: 'Duration for pinned messages',
+    example: '24h | 7d | 30d',
+  })
   async pinMessage(
-    @Param('workspace_id') workspace_id: number,
+    @Param('message_id') message_id: number,
     @Query('isPinned') isPinned: boolean,
-    @Req() req: Request & { user: UserPayload },
+    @Query('duration') duration: '24h' | '7d' | '30d',
   ) {
-    const user = req.user;
-    return await this.chatService.pinMessage(workspace_id, user, isPinned);
+    return await this.chatService.pinMessage(message_id, isPinned, duration);
+  }
+
+  // @Delete('messages/:message_id')
+  // async deleteMessage(
+  //   @Param('message_id') messageId: number,
+  //   @Req() req: Request,
+  // ) {
+  //   const sender_email = req.user.email;  // Assume authentication middleware is in place
+  //   return this.chatService.deleteMessage(messageId, sender_email);
+  // }
+
+  @Post('cron/unpin-expired-messages')
+  async triggerPaymentCron() {
+    await this.chatCronService.unpinExpiredMessages();
+    return 'Cron job executed manually';
   }
 }

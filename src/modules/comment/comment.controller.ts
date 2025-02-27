@@ -81,4 +81,20 @@ export class CommentController {
   ) {
     return this.commentService.getRepliesForComments(id, page);
   }
+
+  // @Delete('comments/:id')
+  // async deleteComment(@Param('id') id: number, @Req() req: Request) {
+  //   const user_email = req.user.email; // Assuming Auth Guard populates req.user
+  //   await this.commentService.deleteComment(id, user_email);
+
+  //   return createResponse(true, 'Comment deleted successfully', {});
+  // }
+
+  // @Delete('replies/:id')
+  // async deleteReply(@Param('id') id: number, @Req() req: Request) {
+  //   const user_email = req.user.email;
+  //   await this.commentService.deleteReply(id, user_email);
+
+  //   return createResponse(true, 'Reply deleted successfully', {});
+  // }
 }

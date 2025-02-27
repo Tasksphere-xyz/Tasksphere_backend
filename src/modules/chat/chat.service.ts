@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,13 +14,11 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { SendWorkspaceMessageDto } from './dto/send-workspace-message.dto';
 import { WorkspaceMessage } from 'src/entities/workspace-message.entity';
-import { UserPayload } from 'express';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from 'src/entities/notification.entity';
 import { WorkspaceService } from '../workspace/workspace.service';
 import { User } from 'src/entities/user.entity';
 import { Workspace } from 'src/entities/workspace.entity';
-import { send } from 'process';
 
 @Injectable()
 export class ChatService {
@@ -58,7 +56,17 @@ export class ChatService {
     return senderMembership;
   }
 
-  public extractMentions(message: string) {
+  public getFirstFiveWords(text: string): string {
+    const words = text.split(/\s+/); // split by any whitespace
+    const firstFive = words.slice(0, 5);
+    return firstFive.join(' ');
+  }
+
+  public async sendNotificationToMentionedUsers(
+    messageContext: string,
+    message: string,
+    sender_name: string,
+  ) {
     // to extract message in this format @username(email@example.com)
     const mentionRegex = /@(\w+)\(([^)]+)\)/g;
     const mentions: { username: string; email: string }[] = [];
@@ -70,27 +78,16 @@ export class ChatService {
         mentions.push({ username: match[1], email: match[2] });
       }
     }
-
-    return mentions;
-  }
-
-  public getFirstFiveWords(text: string): string {
-    const words = text.split(/\s+/); // split by any whitespace
-    const firstFive = words.slice(0, 5);
-    return firstFive.join(' ');
-  }
-
-  private async sendNotificationToMentionedUsers(
-    message: string,
-    sender_name: string,
-  ) {
-    const mentions = this.extractMentions(message);
+    if (mentions.length === 0) {
+      return;
+    }
+    // const mentions = this.extractMentions(message);
     const mentionedEmails = mentions.map((mention) => mention.email);
     await this.notificationService.sendNotification(
       mentionedEmails,
       NotificationType.MENTION,
       'You Were Mentioned',
-      `${sender_name} tagged you in the chat: '${this.getFirstFiveWords(
+      `${sender_name} tagged you in the ${messageContext}: '${this.getFirstFiveWords(
         message,
       )}'`,
     );
@@ -244,7 +241,7 @@ export class ChatService {
     });
 
     // send notification to mentioned usee
-    await this.sendNotificationToMentionedUsers(message, user.username);
+    await this.sendNotificationToMentionedUsers('chat', message, user.username);
 
     // send new message notification to everyone in the workspace
     await this.sendNotificationForNewMessage(
@@ -273,7 +270,16 @@ export class ChatService {
     });
   }
 
-  async pinMessage(message_id: number, user: UserPayload, isPinned: boolean) {
+  async pinMessage(
+    message_id: number,
+    isPinned: boolean,
+    duration: '24h' | '7d' | '30d',
+  ) {
+    if (!isPinned || !duration) {
+      throw new BadRequestException(
+        'Both isPinned and duration must be provided',
+      );
+    }
     const message = await this.workspaceMessageRepository.findOne({
       where: { id: message_id },
     });
@@ -282,15 +288,70 @@ export class ChatService {
       throw new NotFoundException('Message not found');
     }
 
-    // Optional: Check if the user is allowed to pin this message.
-    // if (message.sender_email !== user.email) {
-    //   throw new UnauthorizedException('You cannot pin this message');
-    // }
+    const pinnedCount = await this.workspaceMessageRepository.count({
+      where: {
+        workspace_id: message.workspace_id,
+        isPinned: true,
+      },
+    });
+
+    if (pinnedCount >= 3) {
+      throw new BadRequestException('Maximum of 3 pinned message allowed.');
+    }
+
+    if (isPinned) {
+      const now = new Date();
+      const expiresAt = new Date(now);
+
+      switch (duration) {
+        case '24h':
+          expiresAt.setHours(expiresAt.getHours() + 24);
+          break;
+        case '7d':
+          expiresAt.setDate(expiresAt.getDate() + 7);
+          break;
+        case '30d':
+          expiresAt.setDate(expiresAt.getDate() + 30);
+          break;
+        default:
+          throw new BadRequestException('Invalid duration specified');
+      }
+    } else {
+      message.pinExpiresAt = null;
+    }
 
     // Update the isPinned field
     message.isPinned = isPinned;
     await this.workspaceMessageRepository.save(message);
 
-    return createResponse(true, 'Message pinned successfully', {});
+    return createResponse(true, 'Message pin status updated successfully', {});
   }
+
+  // async deleteMessageInChat(messageId: number, sender_email: string) {
+  //   const message = await this.chatRepository.findOne({
+  //     where: { id: messageId, sender_email },
+  //   });
+  
+  //   if (!message) {
+  //     throw new NotFoundException('Message not found or not authorized.');
+  //   }
+  
+  //   await this.chatRepository.delete(messageId);
+  
+  //   return createResponse(true, 'Message deleted successfully', {});
+
+  // }
+
+  // async deleteMessageInWorkspace(message_id: number, sender_email: string) {
+  //   const message = await this.workspaceMessageRepository.findOne({
+  //     where: { id: message_id, sender_email },
+  //   });
+  
+  //   if (!message) {
+  //     throw new NotFoundException('Message not found or you are not authorized');
+  //   }
+  
+  //   await this.workspaceMessageRepository.delete(message_id); 
+
+  // }
 }

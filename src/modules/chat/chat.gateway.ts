@@ -59,4 +59,16 @@ export class ChatGateway {
     client.join(email); // User joins a room with their email
     console.log(`User ${email} joined chat room`);
   }
+
+  // @SubscribeMessage('deleteMessage')
+  // async handleDeleteMessage(
+  //   @MessageBody('message_id') messageId: number,
+  //   @ConnectedSocket() client: Socket,
+  // ) {
+  //   const sender_email = client.handshake.auth.email;
+  //   await this.chatService.deleteMessageInChat(messageId, sender_email)
+
+  //   // Broadcast to both sender and receiver to remove the message in real-time
+  //   this.server.emit('messageDeleted', { messageId });
+  // }
 }

@@ -13,6 +13,7 @@ import { Workspace } from 'src/entities/workspace.entity';
 import { ChatWorkspaceGateway } from './chat-workspace.gateway';
 import { NotificationModule } from '../notification/notification.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
+import { ChatCronService } from './chat-cron.service';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { WorkspaceModule } from '../workspace/workspace.module';
     WorkspaceModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, ChatGateway, ChatWorkspaceGateway],
+  providers: [ChatService, ChatGateway, ChatWorkspaceGateway, ChatCronService],
   exports: [ChatService],
 })
 export class ChatModule {}

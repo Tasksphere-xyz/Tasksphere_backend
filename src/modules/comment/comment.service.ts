@@ -9,6 +9,7 @@ import { CreateReplyDto } from './dto/create-reply';
 import { createResponse } from 'src/common/dto/response.dto';
 import { UserService } from '../user/user.service';
 import { TaskService } from '../task/task.service';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class CommentService {
@@ -19,6 +20,7 @@ export class CommentService {
     private readonly replyRepository: Repository<Reply>,
     private readonly userService: UserService,
     private readonly taskService: TaskService,
+    private readonly chatService: ChatService,
   ) {}
 
   public async findCommentById(id: number): Promise<Comment> {
@@ -49,6 +51,12 @@ export class CommentService {
 
     await this.commentRepository.save(comment);
 
+    await this.chatService.sendNotificationToMentionedUsers(
+      'comment',
+      content,
+      foundUser.username,
+    );
+
     return createResponse(true, 'comment created successfully', {
       comment,
     });
@@ -70,6 +78,12 @@ export class CommentService {
       content,
     });
     await this.replyRepository.save(reply);
+
+    await this.chatService.sendNotificationToMentionedUsers(
+      'reply',
+      content,
+      foundUser.username,
+    );
 
     return createResponse(true, 'reply created successfully', {
       reply,
@@ -156,4 +170,38 @@ export class CommentService {
       currentPage: page,
     });
   }
+
+  // async deleteComment(id: number, user_email: string) {
+  //   const comment = await this.commentRepository.findOne({
+  //     where: { id },
+  //     relations: ['user'],
+  //   });
+
+  //   if (!comment) {
+  //     throw new NotFoundException('Comment not found');
+  //   }
+
+  //   if (comment.user.email !== user_email) {
+  //     throw new UnauthorizedException('You are not authorized to delete this comment');
+  //   }
+
+  //   await this.commentRepository.delete(id);
+  // }
+
+  // async deleteReply(id: number, user_email: string) {
+  //   const reply = await this.replyRepository.findOne({
+  //     where: { id },
+  //     relations: ['user'],
+  //   });
+
+  //   if (!reply) {
+  //     throw new NotFoundException('Reply not found');
+  //   }
+
+  //   if (reply.user.email !== user_email) {
+  //     throw new UnauthorizedException('You are not authorized to delete this reply');
+  //   }
+
+  //   await this.replyRepository.delete(id);
+  // }
 }

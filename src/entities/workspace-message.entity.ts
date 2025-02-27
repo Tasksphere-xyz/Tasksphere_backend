@@ -25,6 +25,9 @@ export class WorkspaceMessage {
   @Column({ nullable: false, default: false })
   isPinned: boolean;
 
+  @Column({ nullable: true })
+  pinExpiresAt: Date;
+
   @CreateDateColumn()
   created_at: Date;
 }
