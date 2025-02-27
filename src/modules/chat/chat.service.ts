@@ -97,6 +97,7 @@ export class ChatService {
     workspace_id: number,
     workspace_name: string,
     sender_name: string,
+    message: string,
   ) {
     const arrayOfEmail =
       await this.workspaceService.getAllEmailOfMembersOfWorkspace(workspace_id);
@@ -105,7 +106,9 @@ export class ChatService {
         arrayOfEmail,
         NotificationType.NEW_MESSAGE,
         `New Message in ${workspace_name} workspace`,
-        `${sender_name} sent a new message in #${workspace_name}: ${this.getFirstFiveWords}`,
+        `${sender_name} sent a new message in #${workspace_name}: ${this.getFirstFiveWords(
+          message,
+        )}`,
       );
     }
   }
@@ -227,7 +230,7 @@ export class ChatService {
       message,
       fileUrl,
     });
-    await this.chatRepository.save(newMessage);
+    await this.workspaceMessageRepository.save(newMessage);
 
     // get user username only
     const user = await this.userRepository.findOne({
@@ -248,6 +251,7 @@ export class ChatService {
       workspace_id,
       workspace.workspace_name,
       user.username,
+      message,
     );
 
     return createResponse(true, 'Message sent successfully', { newMessage });
@@ -275,11 +279,6 @@ export class ChatService {
     isPinned: boolean,
     duration: '24h' | '7d' | '30d',
   ) {
-    if (!isPinned || !duration) {
-      throw new BadRequestException(
-        'Both isPinned and duration must be provided',
-      );
-    }
     const message = await this.workspaceMessageRepository.findOne({
       where: { id: message_id },
     });
@@ -295,11 +294,11 @@ export class ChatService {
       },
     });
 
-    if (pinnedCount >= 3) {
-      throw new BadRequestException('Maximum of 3 pinned message allowed.');
-    }
-
     if (isPinned) {
+      if (pinnedCount >= 3) {
+        throw new BadRequestException('Maximum of 3 pinned messages allowed.');
+      }
+
       const now = new Date();
       const expiresAt = new Date(now);
 
@@ -316,6 +315,7 @@ export class ChatService {
         default:
           throw new BadRequestException('Invalid duration specified');
       }
+      message.pinExpiresAt = expiresAt;
     } else {
       message.pinExpiresAt = null;
     }
@@ -324,34 +324,49 @@ export class ChatService {
     message.isPinned = isPinned;
     await this.workspaceMessageRepository.save(message);
 
-    return createResponse(true, 'Message pin status updated successfully', {});
+    return createResponse(
+      true,
+      `Message pin status updated to ${isPinned}`,
+      {},
+    );
   }
 
-  // async deleteMessageInChat(messageId: number, sender_email: string) {
-  //   const message = await this.chatRepository.findOne({
-  //     where: { id: messageId, sender_email },
-  //   });
-  
-  //   if (!message) {
-  //     throw new NotFoundException('Message not found or not authorized.');
-  //   }
-  
-  //   await this.chatRepository.delete(messageId);
-  
-  //   return createResponse(true, 'Message deleted successfully', {});
+  async deleteMessageInChat(message_id: number, sender_email: string) {
+    const message = await this.chatRepository.findOne({
+      where: { id: message_id },
+    });
 
-  // }
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
 
-  // async deleteMessageInWorkspace(message_id: number, sender_email: string) {
-  //   const message = await this.workspaceMessageRepository.findOne({
-  //     where: { id: message_id, sender_email },
-  //   });
-  
-  //   if (!message) {
-  //     throw new NotFoundException('Message not found or you are not authorized');
-  //   }
-  
-  //   await this.workspaceMessageRepository.delete(message_id); 
+    if (message.sender_email !== sender_email) {
+      throw new ForbiddenException('You cannot delete this message');
+    }
 
-  // }
+    await this.chatRepository.delete(message_id);
+
+    return createResponse(true, 'Message deleted successfully', {});
+  }
+
+  async deleteMessageInWorkspace(
+    message_id: number,
+    sender_email: string,
+  ) {
+    const message = await this.workspaceMessageRepository.findOne({
+      where: { id: message_id, },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    if (message.sender_email !== sender_email) {
+      throw new ForbiddenException('You cannot delete this message');
+    }
+
+    await this.workspaceMessageRepository.delete(message_id);
+
+    return createResponse(true, 'Message deleted successfully', {});
+  }
 }

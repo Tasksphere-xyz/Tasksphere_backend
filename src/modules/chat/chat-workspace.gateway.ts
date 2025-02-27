@@ -65,25 +65,24 @@ export class ChatWorkspaceGateway {
     console.log(`User ${user_email} joined workspace ${workspace_id}`);
   }
 
-  // @SubscribeMessage('deleteWorkspaceMessage')
-  // async handleDeleteWorkspaceMessage(
-  //   @MessageBody() data: { message_id: number; workspace_id: number },
-  //   @ConnectedSocket() client: Socket,
-  // ) {
-  //   const sender_email = client.handshake.auth.email;
+  @SubscribeMessage('deleteWorkspaceMessage')
+  async handleDeleteWorkspaceMessage(
+    @MessageBody() data: { message_id: number; workspace_id: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const sender_email = client.handshake.auth.email;
 
-  //   // Check if user is in the workspace
-  //   await this.chatService.isUserInWorkspace(data.workspace_id, sender_email);
+    // Delete the message
+    const deletedMessage = await this.chatService.deleteMessageInWorkspace(
+      data.message_id,
+      sender_email,
+    );
 
-  //   // Delete the message
-  //   await this.chatService.deleteMessageInWorkspace
-  //     data.message_id,
-  //     sender_email,
-  //   );
+    // Emit the message deletion event to all members in the workspace
+    this.server
+      .to(`workspace_${data.workspace_id}`)
+      .emit('workspaceMessageDeleted', data.message_id);
 
-  //   // Emit the message deletion event to all members in the workspace
-  //   this.server
-  //     .to(`workspace_${data.workspace_id}`)
-  //     .emit('workspaceMessageDeleted', data.message_id);
-  // }
+    return deletedMessage;
+  }
 }

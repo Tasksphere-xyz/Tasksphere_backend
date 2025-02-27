@@ -10,7 +10,7 @@ import {
 import { Comment } from './comment.entity';
 import { User } from './user.entity';
 
-@Entity('Reply')
+@Entity('reply')
 export class Reply {
   @PrimaryGeneratedColumn()
   id: number;

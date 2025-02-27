@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   Patch,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -87,7 +88,7 @@ export class ChatController {
     );
   }
 
-  @Get('messages/:workspace_id')
+  @Get('workspace/:workspace_id')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Messages retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Messages not found' })
@@ -122,14 +123,34 @@ export class ChatController {
     return await this.chatService.pinMessage(message_id, isPinned, duration);
   }
 
-  // @Delete('messages/:message_id')
-  // async deleteMessage(
-  //   @Param('message_id') messageId: number,
-  //   @Req() req: Request,
-  // ) {
-  //   const sender_email = req.user.email;  // Assume authentication middleware is in place
-  //   return this.chatService.deleteMessage(messageId, sender_email);
-  // }
+  @Delete('delete/:message_id')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Message deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Message not found' })
+  @ApiParam({ name: 'message_id', description: 'ID of the message' })
+  async deleteMessageInChat(
+    @Param('message_id') message_id: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const sender_email = req.user.email;
+    return await this.chatService.deleteMessageInChat(message_id, sender_email);
+  }
+
+  @Delete('workspace/delete/:message_id')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Message deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Message not found' })
+  @ApiParam({ name: 'message_id', description: 'ID of the message' })
+  async deleteMessageInWorkspace(
+    @Param('message_id') message_id: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const sender_email = req.user.email;
+    return await this.chatService.deleteMessageInWorkspace(
+      message_id,
+      sender_email,
+    );
+  }
 
   @Post('cron/unpin-expired-messages')
   async triggerPaymentCron() {

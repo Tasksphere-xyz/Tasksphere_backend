@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Comment } from 'src/entities/comment.entity';
 import { Reply } from 'src/entities/reply.entity';
@@ -24,13 +28,29 @@ export class CommentService {
   ) {}
 
   public async findCommentById(id: number): Promise<Comment> {
-    const comment = await this.commentRepository.findOne({ where: { id } });
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
 
     if (!comment) {
       throw new NotFoundException(`Comment not found`);
     }
 
     return comment;
+  }
+
+  public async findReplyById(id: number): Promise<Reply> {
+    const reply = await this.replyRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!reply) {
+      throw new NotFoundException('Reply not found');
+    }
+
+    return reply;
   }
 
   async createComment(
@@ -171,37 +191,26 @@ export class CommentService {
     });
   }
 
-  // async deleteComment(id: number, user_email: string) {
-  //   const comment = await this.commentRepository.findOne({
-  //     where: { id },
-  //     relations: ['user'],
-  //   });
+  async deleteComment(id: number, user_email: string) {
+    const comment = await this.findCommentById(id);
 
-  //   if (!comment) {
-  //     throw new NotFoundException('Comment not found');
-  //   }
+    if (comment.user.email !== user_email) {
+      throw new UnauthorizedException('You cannot delete this comment');
+    }
 
-  //   if (comment.user.email !== user_email) {
-  //     throw new UnauthorizedException('You are not authorized to delete this comment');
-  //   }
+    await this.commentRepository.delete(id);
 
-  //   await this.commentRepository.delete(id);
-  // }
+    return createResponse(true, 'Comment deleted successfully', {});
+  }
 
-  // async deleteReply(id: number, user_email: string) {
-  //   const reply = await this.replyRepository.findOne({
-  //     where: { id },
-  //     relations: ['user'],
-  //   });
+  async deleteReply(id: number, user_email: string) {
+    const reply = await this.findReplyById(id);
 
-  //   if (!reply) {
-  //     throw new NotFoundException('Reply not found');
-  //   }
+    if (reply.user.email !== user_email) {
+      throw new UnauthorizedException('You cannot delete this reply');
+    }
 
-  //   if (reply.user.email !== user_email) {
-  //     throw new UnauthorizedException('You are not authorized to delete this reply');
-  //   }
-
-  //   await this.replyRepository.delete(id);
-  // }
+    await this.replyRepository.delete(id);
+    return createResponse(true, 'Reply deleted successfully', {});
+  }
 }
