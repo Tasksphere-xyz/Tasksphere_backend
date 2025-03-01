@@ -28,11 +28,15 @@ import { UserPayload } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from 'src/utils/multer.util';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { TaskCronService } from './task-cron.service';
 
 @ApiTags('task')
 @Controller('task')
 export class TaskController {
-  constructor(private readonly taskService: TaskService) {}
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly taskCronService: TaskCronService,
+  ) {}
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
@@ -152,44 +156,59 @@ export class TaskController {
 
   @Get('/history')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Task history retrieved successfully' })
-  @ApiQuery({ 
-    name: 'page', 
-    required: true, 
-    type: Number, 
-    description: 'Page number for pagination' 
+  @ApiResponse({
+    status: 200,
+    description: 'Task history retrieved successfully',
   })
-  @ApiQuery({ 
-    name: 'assignedTo', 
-    required: false, 
-    type: Number, 
-    description: 'User ID of the assigned user'
-   })
-  @ApiQuery({ 
-    name: 'action', 
-    required: false, 
-    enum: ['status-change', 'assignment'], 
-    description: 'Filter by action type' 
+  @ApiQuery({
+    name: 'page',
+    required: true,
+    type: Number,
+    description: 'Page number for pagination',
   })
-  @ApiQuery({ 
-    name: 'from', 
-    required: false, 
-    type: String, 
-    description: 'Start date (YYYY-MM-DD)'
+  @ApiQuery({
+    name: 'assignedTo',
+    required: false,
+    type: Number,
+    description: 'User ID of the assigned user',
   })
-  @ApiQuery({ 
-    name: 'to', 
-    required: false, 
-    type: String, 
-    description: 'End date (YYYY-MM-DD)'
+  @ApiQuery({
+    name: 'action',
+    required: false,
+    enum: ['status-change', 'assignment'],
+    description: 'Filter by action type',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
   })
   async getTaskHistory(
     @Query('page') page: number,
     @Query('assignedTo') assignedTo?: number,
     @Query('action') action?: 'status-change' | 'assignment',
     @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query('to') to?: string,
   ) {
-    return this.taskService.getAllTaskHistory(page, assignedTo, action, from, to);
+    return this.taskService.getAllTaskHistory(
+      page,
+      assignedTo,
+      action,
+      from,
+      to,
+    );
+  }
+
+  @Post('cron/task-deadline-notification')
+  async triggerPaymentCron() {
+    await this.taskCronService.notifyTaskDeadlines();
+    return 'Cron job executed manually';
   }
 }

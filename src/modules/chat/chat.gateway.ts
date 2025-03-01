@@ -39,10 +39,10 @@ export class ChatGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const sender_email = client.handshake.auth.email;
-    const newMessage = await this.chatService.sendMessage(
+    const newMessage = await this.chatService.sendMessage(sender_email, {
+      ...data,
       sender_email,
-      { ...data, sender_email },
-    );
+    });
 
     // Emit the new message to the receiver in real-time
     this.server.to(data.receiver_email).emit('receiveMessage', newMessage);
@@ -58,5 +58,22 @@ export class ChatGateway {
   ) {
     client.join(email); // User joins a room with their email
     console.log(`User ${email} joined chat room`);
+  }
+
+  @SubscribeMessage('deleteMessage')
+  async handleDeleteMessage(
+    @MessageBody('message_id') messageId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const sender_email = client.handshake.auth.email;
+    const deletedMessage = await this.chatService.deleteMessageInChat(
+      messageId,
+      sender_email,
+    );
+
+    // Broadcast to both sender and receiver to remove the message in real-time
+    this.server.emit('messageDeleted', { messageId });
+
+    return deletedMessage;
   }
 }

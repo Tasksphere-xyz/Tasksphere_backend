@@ -13,7 +13,7 @@ export enum NotificationType {
   NEW_MESSAGE = 'NEW_MESSAGE',
 }
 
-@Entity('Notification')
+@Entity('notification')
 export class Notification {
   @PrimaryGeneratedColumn()
   id: number;

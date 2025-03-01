@@ -34,7 +34,7 @@ export class WorkspaceService {
     private readonly userService: UserService,
   ) {}
 
-  private async getAllEmailOfMembersOfWorkspace(workspaceId: number) {
+  public async getAllEmailOfMembersOfWorkspace(workspaceId: number) {
     const members = await this.workspaceMembershipRepository.find({
       where: { workspace_id: workspaceId, status: 'accepted' },
     });
