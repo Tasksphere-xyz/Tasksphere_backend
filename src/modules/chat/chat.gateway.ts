@@ -76,4 +76,62 @@ export class ChatGateway {
 
     return deletedMessage;
   }
+
+  // Handle a user starting a call (Send WebRTC Offer)
+  @SubscribeMessage('startCall')
+  async handleStartCall(
+    @MessageBody() data: { caller: string; receiver: string; offer: any },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`Call started by ${data.caller} to ${data.receiver}`);
+
+    // Emit the WebRTC offer to the receiver
+    this.server.to(data.receiver).emit('incomingCall', {
+      caller: data.caller,
+      offer: data.offer,
+    });
+  }
+
+  // Handle a user accepting a call (Send WebRTC Answer)
+  @SubscribeMessage('answerCall')
+  async handleAnswerCall(
+    @MessageBody() data: { caller: string; receiver: string; answer: any },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`${data.receiver} answered the call from ${data.caller}`);
+
+    // Emit the WebRTC answer to the caller
+    this.server.to(data.caller).emit('callAnswered', {
+      receiver: data.receiver,
+      answer: data.answer,
+    });
+  }
+
+  // Handle ICE Candidate Exchange
+  @SubscribeMessage('iceCandidate')
+  async handleIceCandidate(
+    @MessageBody() data: { sender: string; receiver: string; candidate: any },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`ICE candidate sent from ${data.sender} to ${data.receiver}`);
+
+    // Forward ICE candidate to the other user
+    this.server.to(data.receiver).emit('iceCandidate', {
+      sender: data.sender,
+      candidate: data.candidate,
+    });
+  }
+
+  // Handle Call End
+  @SubscribeMessage('endCall')
+  async handleEndCall(
+    @MessageBody() data: { sender: string; receiver: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`Call ended between ${data.sender} and ${data.receiver}`);
+
+    // Notify both users to end the call
+    this.server.to(data.receiver).emit('callEnded', { sender: data.sender });
+    this.server.to(data.sender).emit('callEnded', { receiver: data.receiver });
+  }
 }
