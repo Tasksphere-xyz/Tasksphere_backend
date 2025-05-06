@@ -1,11 +1,15 @@
-import { Controller, Get, Req, Request, Res, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+/* eslint-disable prettier/prettier */
+import { Body, Controller, Get, Post, Req, Request, Res, UseGuards } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createResponse } from 'src/common/dto/response.dto';
 import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
+import { LoginDto, SignupDto } from './dto/auth.dto';
+import { AuthService } from './auth.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  constructor(private readonly authService: AuthService) {}
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   async googleLogin(): Promise<{ url: string }> {
@@ -30,5 +34,19 @@ export class AuthController {
       message: 'Login successful',
       data: { user, access_token },
     });
+  }
+
+  @Post('signup')
+  @ApiOperation({ summary: 'Sign up with email and password' })
+  @ApiBody({ type: SignupDto })
+  async signup(@Body() signupDto: SignupDto) {
+    return await this.authService.signup(signupDto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({ type: LoginDto })
+  async login(@Body() loginDto: LoginDto) {
+    return await this.authService.login(loginDto);
   }
 }
