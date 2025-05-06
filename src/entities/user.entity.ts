@@ -20,8 +20,11 @@ export class User {
   @Column({ nullable: true })
   displayPic: string;
 
-  @Column({ nullable: false })
+  @Column({ nullable: true })
   googleId: string;
+
+  @Column({ nullable: true })
+  password: string;
 
   @CreateDateColumn({ nullable: false })
   createdAt: Date;
