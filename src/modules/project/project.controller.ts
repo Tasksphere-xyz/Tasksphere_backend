@@ -25,7 +25,10 @@ export class ProjectController {
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Project created successfully' })
   @ApiResponse({ status: 400, description: 'Failed to create project' })
-  async createProject(@Body() createProjectDto: CreateProjectDto, @Req() req) {
+  async createProject(
+    @Body() createProjectDto: CreateProjectDto,
+    @Req() req: Request & { user: UserPayload },
+  ) {
     const user = req.user;
     return await this.projectService.createProject(createProjectDto, user);
   }
@@ -69,14 +72,20 @@ export class ProjectController {
     @Req() req: Request & { user: UserPayload },
     @Query('page') page: number,
   ) {
-    const user = req.user
+    const user = req.user;
     return this.projectService.getProjectMembers(projectId, user, page);
   }
 
   @Post(':projectId/join')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'User successfully joined the project' })
-  @ApiResponse({ status: 400, description: 'Invalid invitation or project does not exist' })
+  @ApiResponse({
+    status: 200,
+    description: 'User successfully joined the project',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid invitation or project does not exist',
+  })
   @ApiParam({ name: 'projectId', description: 'ID of the project' })
   async joinProject(
     @Param('projectId') projectId: number,
