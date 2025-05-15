@@ -17,7 +17,7 @@ export class WorkspaceController {
   @ApiResponse({ status: 200, description: 'Workspace created successfully' })
   @ApiResponse({ status: 400, description: 'Failed to create workspace' })
   @ApiParam({ name: 'projectId', description: 'id of the project' })
-  async createProject(
+  async createWorkspace(
     @Param('projectId') projectId: string,
     @Body() createWorkspaceDto: CreateWorkspaceDto,
     @Req() req: Request & { user: UserPayload },
