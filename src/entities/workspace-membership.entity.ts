@@ -19,10 +19,10 @@ export class WorkspaceMembership {
   @Column()
   workspace_id: number;
 
-  // // Define the ManyToOne relationship to Workspace
-  // @ManyToOne(() => Workspace, workspace => workspace.memberships)
-  // @JoinColumn({ name: 'workspace_id' })
-  // workspace: Workspace;
+  // Define the ManyToOne relationship to Workspace
+  @ManyToOne(() => Workspace, workspace => workspace.memberships)
+  @JoinColumn({ name: 'workspace_id' })
+  workspace: Workspace;
   
   @Column()
   email: string;

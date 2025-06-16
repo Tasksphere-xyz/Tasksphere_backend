@@ -21,9 +21,9 @@ export class Task {
   @Column()
   workspace_id: number;
 
-  @ManyToOne(() => Workspace)
-  @JoinColumn({ name: 'workspace_id' })
-  workspace: Workspace;
+  // @ManyToOne(() => Workspace)
+  // @JoinColumn({ name: 'workspace_id' })
+  // workspace: Workspace;
 
   @Column()
   title: string;
