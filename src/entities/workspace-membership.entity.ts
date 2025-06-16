@@ -1,4 +1,5 @@
 /* eslint-disable prettier/prettier */
+// src/entities/workspace-membership.entity.ts (Previously project-membership.entity.ts)
 import {
   Entity,
   Column,
@@ -18,10 +19,11 @@ export class WorkspaceMembership {
   @Column()
   workspace_id: number;
 
-  @ManyToOne(() => Workspace)
+  // Define the ManyToOne relationship to Workspace
+  @ManyToOne(() => Workspace, workspace => workspace.memberships)
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
-
+  
   @Column()
   email: string;
 
@@ -29,10 +31,7 @@ export class WorkspaceMembership {
   status: 'pending' | 'accepted' | 'declined';
 
   @Column({ nullable: true })
-  role: 'admin' | 'member';
-
-  @CreateDateColumn({ nullable: false })
-  invited_at: Date;
+  role: 'admin' | 'member' | 'owner';
 
   @CreateDateColumn({ nullable: false })
   createdAt: Date;

@@ -1,4 +1,5 @@
 /* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-inferrable-types */
 import {
   BadRequestException,
   ForbiddenException,
@@ -11,28 +12,207 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from 'src/entities/workspace.entity';
 import { Repository } from 'typeorm';
 import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
-import { ProjectMembership } from 'src/entities/project-membership.entity';
 import { createResponse } from 'src/common/dto/response.dto';
-import { InviteUserDto } from '../project/dto/invite-user.dto';
-// import { User } from 'src/entities/user.entity';
+import { InviteUserDto } from './dto/invite-user.dto';
 import { EmailService } from 'src/common/email/email.service';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from 'src/entities/notification.entity';
 import { UserService } from '../user/user.service';
+import { NotificationType } from 'src/entities/notification.entity';
 
 @Injectable()
 export class WorkspaceService {
   constructor(
-    @InjectRepository(ProjectMembership)
-    private projectMembershipRepository: Repository<ProjectMembership>,
     @InjectRepository(Workspace)
     private workspaceRepository: Repository<Workspace>,
-    @InjectRepository(WorkspaceMembership)
+    @InjectRepository(WorkspaceMembership) 
     private workspaceMembershipRepository: Repository<WorkspaceMembership>,
-    private readonly emailService: EmailService,
+    private emailService: EmailService,
     private readonly notificationService: NotificationService,
     private readonly userService: UserService,
   ) {}
+
+  private async checkWorkspaceMembership(
+    workspace_id: number,
+    email: string,
+    status?: 'accepted' | 'pending' | 'declined',
+  ) {
+    const whereConditions: any = { workspace_id, email };
+    if (status) {
+      whereConditions.status = status;
+    }
+
+    const membership = await this.workspaceMembershipRepository.findOne({
+      where: whereConditions,
+    });
+
+    return membership;
+  }
+
+  async createWorkspace(createWorkspaceDto: CreateWorkspaceDto, user: UserPayload) {
+    const { workspace_name, description } = createWorkspaceDto;
+
+    const newWorkspace = await this.workspaceRepository.save({
+      workspace_name,
+      description,
+    });
+
+    if (!newWorkspace) {
+      throw new BadRequestException('Failed to create workspace');
+    }
+
+    await this.workspaceMembershipRepository.save({
+      workspace_id: newWorkspace.id,
+      email: user.email,
+      status: 'accepted',
+      role: 'owner',
+    });
+
+    return createResponse(true, 'Workspace created successfully', { newWorkspace });
+  }
+
+  async inviteUserToWorkspace(
+    workspace_id: number,
+    inviteUserDto: InviteUserDto,
+    user: UserPayload,
+  ) {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspace_id },
+    });
+    if (!workspace) throw new NotFoundException('Workspace not found');
+
+    const inviter = await this.checkWorkspaceMembership(
+      workspace_id,
+      user.email,
+      'accepted',
+    );
+
+    if (!inviter || (inviter.role !== 'owner' && inviter.role !== 'admin')) {
+      throw new ForbiddenException('Not authorized to invite users');
+    }
+
+    const { emails } = inviteUserDto;
+    const existingMembers: string[] = [];
+    const invitedMembers: string[] = [];
+
+    for (const email of emails) {
+      const existingMembership = await this.checkWorkspaceMembership(
+        workspace_id,
+        email,
+      );
+      if (existingMembership) {
+        existingMembers.push(email);
+        continue;
+      }
+
+      await this.workspaceMembershipRepository.save({
+        workspace_id,
+        email,
+        status: 'pending',
+        role: 'member',
+      });
+
+      await this.emailService.sendEmail(
+        email,
+        'Invitation to join Workspace',
+        `<span class="math-inline">\{inviter\.email\} has invited you to join '</span>{workspace.workspace_name}'. Click <a href="#">here</a> to accept the invitation.`,
+      );
+
+      invitedMembers.push(email);
+    }
+
+    const message = `${invitedMembers.length} ${
+      invitedMembers.length > 1 ? 'Users' : 'User'
+    } invited to workspace successfully`; 
+
+    return createResponse(true, message, {
+      existingMembers,
+      invitedMembers,
+    });
+  }
+
+  async getWorkspaceMembers(
+    workspace_id: number,
+    user: UserPayload,
+    page: number = 1,
+  ) {
+    page = page > 0 ? page : 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspace_id },
+    });
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const userMembership = await this.checkWorkspaceMembership(
+      workspace_id,
+      user.email,
+    );
+    if (!userMembership) {
+      throw new ForbiddenException('Not a member of the workspace');
+    }
+
+    const [members, total] =
+      await this.workspaceMembershipRepository.findAndCount({ 
+        where: { workspace_id },
+        order: { createdAt: 'DESC' },
+        skip,
+        take: limit,
+      });
+
+    const totalPages = Math.ceil(total / limit);
+
+    const message =
+      members.length === 0
+        ? 'No team members found'
+        : 'Team members retrieved successfully';
+
+    return createResponse(true, message, {
+      members,
+      totalPages: totalPages === 0 ? 1 : totalPages,
+      currentPage: page,
+    });
+  }
+
+  async joinWorkspace(workspace_id: number, user: UserPayload) {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspace_id },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const invitation = await this.checkWorkspaceMembership(
+      workspace_id,
+      user.email,
+      'pending',
+    );
+
+    if (!invitation) {
+      throw new ForbiddenException('You are not invited to this workspace'); 
+    }
+
+    invitation.status = 'accepted';
+    await this.workspaceMembershipRepository.save(invitation);
+
+    const invitedUser = await this.userService.findUserByEmail(user.email);
+    const arrayOfEmail = await this.getAllEmailOfMembersOfWorkspace(workspace_id);
+    if (arrayOfEmail.length > 0) {
+        await this.notificationService.sendNotification(
+            arrayOfEmail,
+            NotificationType.NEW_MEMBER,
+            'New Member Joined',
+            `<span class="math-inline">\{invitedUser\.username\} has joined the workspace\: '</span>{workspace.workspace_name}'`,
+        );
+    }
+
+    return createResponse(true, 'Successfully joined the workspace', {
+      workspace,
+    });
+  }
 
   public async getAllEmailOfMembersOfWorkspace(workspaceId: number) {
     const members = await this.workspaceMembershipRepository.find({
@@ -47,105 +227,6 @@ export class WorkspaceService {
     }
   }
 
-  async createWorkspace(
-    createWorkspaceDto: CreateWorkspaceDto,
-    user: UserPayload,
-    project_id: number,
-  ) {
-    const isMemberOfProject = await this.projectMembershipRepository.findOne({
-      where: { project_id, email: user.email, status: 'accepted' },
-    });
-
-    if (!isMemberOfProject) {
-      throw new BadRequestException("Can't create a workspace");
-    }
-
-    const newWorkspace = await this.workspaceRepository.save({
-      project_id,
-      workspace_name: createWorkspaceDto.workspace_name,
-    });
-
-    if (!newWorkspace) {
-      throw new BadRequestException('Failed to create workspace');
-    }
-
-    await this.workspaceMembershipRepository.save({
-      workspace_id: newWorkspace.id,
-      email: user.email,
-      role: 'admin',
-      status: 'accepted',
-    });
-
-    return createResponse(true, 'Workspace created successfully', {
-      newWorkspace,
-    });
-  }
-
-  async inviteUserToWorkspace(
-    workspace_id: number,
-    inviteUserDto: InviteUserDto,
-    user: UserPayload,
-  ) {
-    // check if workspace exists
-    const workspace = await this.workspaceRepository.findOne({
-      where: { id: workspace_id },
-    });
-    if (!workspace) throw new NotFoundException('Workspace not found');
-
-    // check the eligibility of the inviter
-    const inviter = await this.workspaceMembershipRepository.findOne({
-      where: { workspace_id, email: user.email, status: 'accepted' },
-    });
-    if (!inviter || inviter.role !== 'admin') {
-      throw new ForbiddenException('Not authorized to invite users.');
-    }
-
-    const { emails } = inviteUserDto;
-    const existingMembers: string[] = [];
-    const nonProjectMembers: string[] = [];
-    const invitedMembers: string[] = [];
-
-    for (const email of emails) {
-      // Check if user is already a member of the workspace
-      const existingMembership =
-        await this.workspaceMembershipRepository.findOne({
-          where: { workspace_id, email },
-        });
-      if (existingMembership) {
-        existingMembers.push(email);
-        continue;
-      }
-
-      // Check if user is part of the project
-      const isMemberOfProject = await this.projectMembershipRepository.findOne({
-        where: { project_id: workspace.project_id, email },
-      });
-      if (!isMemberOfProject) {
-        nonProjectMembers.push(email);
-        continue;
-      }
-
-      // Send invitation email
-      await this.emailService.sendEmail(
-        email,
-        'Invitation to join Workspace',
-        `${inviter.email} has invited you to join this workspace. Click <a href="#">here</a> to accept the invitation.`,
-      );
-
-      invitedMembers.push(email);
-    }
-
-    const message = `${invitedMembers.length} ${
-      invitedMembers.length > 1 ? 'Users' : 'User'
-    } invited to project successfully`;
-
-    return createResponse(true, message, {
-      existingMembers,
-      nonProjectMembers,
-      invitedMembers,
-    });
-  }
-
   async getAllUserWorkspaces(user: UserPayload) {
     const workspaces = await this.workspaceMembershipRepository.find({
       where: { email: user.email, status: 'accepted' },
@@ -156,50 +237,10 @@ export class WorkspaceService {
       throw new NotFoundException('No workspaces found');
     }
 
-    const userWorkspaces = workspaces.map((membership) => membership.workspace);
+    const userWorkspaces = workspaces.map((membership) => membership.workspace_id);
 
     return createResponse(true, 'Workspaces retrieved successfully', {
       workspaces: userWorkspaces,
-    });
-  }
-
-  async joinWorkspace(workspace_id: number, user: UserPayload) {
-    const workspace = await this.workspaceRepository.findOne({
-      where: { id: workspace_id },
-    });
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    const invitation = await this.workspaceMembershipRepository.findOne({
-      where: { workspace_id, email: user.email, status: 'pending' },
-    });
-
-    if (!invitation) {
-      throw new ForbiddenException('You are not invited to this workspace');
-    }
-
-    // Update the invitation status to accepted
-    invitation.status = 'accepted';
-    await this.workspaceMembershipRepository.save(invitation);
-
-    // send notigfication to user
-    const invitedUser = await this.userService.findUserByEmail(user.email);
-    const arrayOfEmail = await this.getAllEmailOfMembersOfWorkspace(
-      workspace_id,
-    );
-    if (arrayOfEmail.length > 0) {
-      await this.notificationService.sendNotification(
-        arrayOfEmail,
-        NotificationType.NEW_MEMBER,
-        'New Member Joined',
-        `${invitedUser.username} has joined the workspace: '${workspace.workspace_name}'`,
-      );
-    }
-
-    return createResponse(true, 'Successfully joined the workspace', {
-      workspace,
     });
   }
 }

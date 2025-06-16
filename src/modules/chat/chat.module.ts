@@ -5,7 +5,6 @@ import { ChatController } from './chat.controller';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
 import { ChatMessage } from 'src/entities/chat-message.entity';
-import { ProjectMembership } from 'src/entities/project-membership.entity';
 import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { WorkspaceMessage } from 'src/entities/workspace-message.entity';
 import { User } from 'src/entities/user.entity';
@@ -19,7 +18,6 @@ import { ChatCronService } from './chat-cron.service';
   imports: [
     TypeOrmModule.forFeature([
       ChatMessage,
-      ProjectMembership,
       WorkspaceMembership,
       WorkspaceMessage,
       User,

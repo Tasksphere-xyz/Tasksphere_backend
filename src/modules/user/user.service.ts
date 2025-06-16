@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-inferrable-types */
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -122,7 +122,7 @@ export class UserService {
 
     // Extract workspace names from memberships
     const workspaceNames = workspaceMemberships.map(
-      (membership) => membership.workspace.workspace_name,
+      (membership) => membership.workspace_id,
     );
 
     return createResponse(true, 'User profile retrieved successfully', {

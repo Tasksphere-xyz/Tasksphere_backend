@@ -18,7 +18,7 @@ export class ChatMessage {
   receiver_email: string;
 
   @Column()
-  project_id: number;
+  workspace_id: number;
 
   @Column({ type: 'text', nullable: true })
   message?: string;

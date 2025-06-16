@@ -36,43 +36,44 @@ export class ChatController {
 
   @Post('send')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Message sent successfully' })
-  async sendMessage(@Req() req, @Body() sendMessageDto: SendMessageDto) {
+  @ApiResponse({ status: 200, description: 'Direct message sent successfully within workspace' })
+  async sendMessage(@Req() req: Request & { user: UserPayload }, @Body() sendMessageDto: SendMessageDto) {
     const sender_email = req.user.email;
     return await this.chatService.sendMessage(sender_email, sendMessageDto);
   }
 
-  @Get('messages/:project_id/:receiver_email')
+  // getMessages: Now includes :workspace_id in path
+  @Get('messages/:workspace_id/:receiver_email')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Messages retrieved successfully' })
-  @ApiResponse({ status: 400, description: 'Messages not found' })
-  @ApiParam({ name: 'project_id', description: 'Project ID' })
+  @ApiResponse({ status: 200, description: 'Direct messages retrieved successfully within workspace' })
+  @ApiResponse({ status: 400, description: 'Messages not found or user not in workspace' })
+  @ApiParam({ name: 'workspace_id', description: 'Workspace ID' })
   @ApiParam({ name: 'receiver_email', description: 'Receiver email' })
   async getMessages(
-    @Param('project_id') project_id: number,
+    @Param('workspace_id') workspace_id: number,
     @Param('receiver_email') receiver_email: string,
-    @Req() req,
+    @Req() req: Request & { user: UserPayload },
   ) {
     const sender_email = req.user.email;
     return await this.chatService.getMessages(
       sender_email,
       receiver_email,
-      project_id,
+      workspace_id,
     );
   }
 
   @Get('chatlist')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Chat list retrieved successfully' })
-  @ApiResponse({ status: 400, description: 'Chat not found' })
-  async getChatList(@Req() req) {
+  @ApiResponse({ status: 200, description: 'Chat list per workspace retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'No chats found' })
+  async getChatList(@Req() req: Request & { user: UserPayload }) {
     const user_email = req.user.email;
     return await this.chatService.getChatList(user_email);
   }
 
   @Post('workspace/send')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Message sent successfully' })
+  @ApiResponse({ status: 200, description: 'Workspace message sent successfully' })
   @ApiResponse({
     status: 400,
     description: 'User must be a member of workspace',
@@ -90,9 +91,9 @@ export class ChatController {
 
   @Get('workspace/:workspace_id')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Messages retrieved successfully' })
+  @ApiResponse({ status: 200, description: 'Workspace messages retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Messages not found' })
-  @ApiParam({ name: 'workspace_id', description: 'Project ID' })
+  @ApiParam({ name: 'workspace_id', description: 'Workspace ID' })
   async getWorkspaceMessages(
     @Param('workspace_id') workspace_id: number,
     @Req() req: Request & { user: UserPayload },
@@ -109,23 +110,25 @@ export class ChatController {
   })
   @ApiResponse({ status: 400, description: 'Message not found' })
   @ApiParam({ name: 'message_id', description: 'ID of the message' })
-  @ApiQuery({ name: 'isPinned', description: 'Query to pin messages' })
+  @ApiQuery({ name: 'isPinned', description: 'Query to pin messages', type: Boolean })
   @ApiQuery({
     name: 'duration',
     description: 'Duration for pinned messages',
-    example: '24h | 7d | 30d',
+    enum: ['24h', '7d', '30d'],
+    required: false
   })
   async pinMessage(
     @Param('message_id') message_id: number,
     @Query('isPinned') isPinned: boolean,
     @Query('duration') duration: '24h' | '7d' | '30d',
   ) {
-    return await this.chatService.pinMessage(message_id, isPinned, duration);
+    const isPinnedBoolean = String(isPinned).toLowerCase() === 'true';
+    return await this.chatService.pinMessage(message_id, isPinnedBoolean, duration);
   }
 
   @Delete('delete/:message_id')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Message deleted successfully' })
+  @ApiResponse({ status: 200, description: 'Direct message deleted successfully' })
   @ApiResponse({ status: 400, description: 'Message not found' })
   @ApiParam({ name: 'message_id', description: 'ID of the message' })
   async deleteMessageInChat(
@@ -138,7 +141,7 @@ export class ChatController {
 
   @Delete('workspace/delete/:message_id')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: 'Message deleted successfully' })
+  @ApiResponse({ status: 200, description: 'Workspace message deleted successfully' })
   @ApiResponse({ status: 400, description: 'Message not found' })
   @ApiParam({ name: 'message_id', description: 'ID of the message' })
   async deleteMessageInWorkspace(

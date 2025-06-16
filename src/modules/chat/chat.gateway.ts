@@ -21,116 +21,107 @@ export class ChatGateway {
 
   constructor(private readonly chatService: ChatService) {}
 
-  // When a client connects
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
   }
 
-  // When a client disconnects
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  // Listen for new messages from clients using DTO
   @SubscribeMessage('sendMessage')
-  @UsePipes(new ValidationPipe()) // Ensures DTO validation
+  @UsePipes(new ValidationPipe())
   async handleSendMessage(
-    @MessageBody() data: Omit<SendMessageDto, 'sender_email'>, // Using DTO here
+    @MessageBody() data: Omit<SendMessageDto, 'sender_email'>,
     @ConnectedSocket() client: Socket,
   ) {
     const sender_email = client.handshake.auth.email;
     const newMessage = await this.chatService.sendMessage(sender_email, {
       ...data,
-      sender_email,
     });
 
-    // Emit the new message to the receiver in real-time
-    this.server.to(data.receiver_email).emit('receiveMessage', newMessage);
+    // Emit the new message to both sender and receiver within the specific workspace room
+    this.server.to(`direct_chat_${data.workspace_id}_${sender_email}`).emit('receiveMessage', newMessage);
+    this.server.to(`direct_chat_${data.workspace_id}_${data.receiver_email}`).emit('receiveMessage', newMessage);
 
     return newMessage;
   }
 
-  // Let users join their chat rooms
+  // Let users join their direct chat rooms, now scoped by workspace
   @SubscribeMessage('joinChat')
   async handleJoinChat(
-    @MessageBody() email: string,
+    @MessageBody() data: { workspace_id: number; user_email: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(email); // User joins a room with their email
-    console.log(`User ${email} joined chat room`);
+    // A user joins a room representing their direct messages within a specific workspace
+    client.join(`direct_chat_${data.workspace_id}_${data.user_email}`);
+    console.log(`User ${data.user_email} joined direct chat room for workspace ${data.workspace_id}`);
   }
 
   @SubscribeMessage('deleteMessage')
   async handleDeleteMessage(
-    @MessageBody('message_id') messageId: number,
+    @MessageBody() data: { message_id: number; workspace_id: number; receiver_email: string }, // Added workspace_id and receiver_email for targeting
     @ConnectedSocket() client: Socket,
   ) {
     const sender_email = client.handshake.auth.email;
     const deletedMessage = await this.chatService.deleteMessageInChat(
-      messageId,
+      data.message_id,
       sender_email,
     );
 
-    // Broadcast to both sender and receiver to remove the message in real-time
-    this.server.emit('messageDeleted', { messageId });
+    // Emit to both original sender and receiver within the specific workspace room
+    this.server.to(`direct_chat_${data.workspace_id}_${sender_email}`).emit('messageDeleted', { messageId: data.message_id });
+    this.server.to(`direct_chat_${data.workspace_id}_${data.receiver_email}`).emit('messageDeleted', { messageId: data.message_id });
+
 
     return deletedMessage;
   }
 
-  // Handle a user starting a call (Send WebRTC Offer)
+  // Video call methods remain peer-to-peer, but consider if they also need workspace scoping.
+  // For now, leaving them as global peer-to-peer as they were. If they need to be workspace-scoped,
+  // the `data` objects would need a `workspace_id` and rooms would need to be `workspace_${id}_call` or similar.
   @SubscribeMessage('startCall')
   async handleStartCall(
     @MessageBody() data: { caller: string; receiver: string; offer: any },
     @ConnectedSocket() client: Socket,
   ) {
     console.log(`Call started by ${data.caller} to ${data.receiver}`);
-
-    // Emit the WebRTC offer to the receiver
     this.server.to(data.receiver).emit('incomingCall', {
       caller: data.caller,
       offer: data.offer,
     });
   }
 
-  // Handle a user accepting a call (Send WebRTC Answer)
   @SubscribeMessage('answerCall')
   async handleAnswerCall(
     @MessageBody() data: { caller: string; receiver: string; answer: any },
     @ConnectedSocket() client: Socket,
   ) {
     console.log(`${data.receiver} answered the call from ${data.caller}`);
-
-    // Emit the WebRTC answer to the caller
     this.server.to(data.caller).emit('callAnswered', {
       receiver: data.receiver,
       answer: data.answer,
     });
   }
 
-  // Handle ICE Candidate Exchange
   @SubscribeMessage('iceCandidate')
   async handleIceCandidate(
     @MessageBody() data: { sender: string; receiver: string; candidate: any },
     @ConnectedSocket() client: Socket,
   ) {
     console.log(`ICE candidate sent from ${data.sender} to ${data.receiver}`);
-
-    // Forward ICE candidate to the other user
     this.server.to(data.receiver).emit('iceCandidate', {
       sender: data.sender,
       candidate: data.candidate,
     });
   }
 
-  // Handle Call End
   @SubscribeMessage('endCall')
   async handleEndCall(
     @MessageBody() data: { sender: string; receiver: string },
     @ConnectedSocket() client: Socket,
   ) {
     console.log(`Call ended between ${data.sender} and ${data.receiver}`);
-
-    // Notify both users to end the call
     this.server.to(data.receiver).emit('callEnded', { sender: data.sender });
     this.server.to(data.sender).emit('callEnded', { receiver: data.receiver });
   }
