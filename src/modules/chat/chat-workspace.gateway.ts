@@ -59,7 +59,7 @@ export class ChatWorkspaceGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const user_email = client.handshake.auth.email;
-    await this.chatService.isUserInWorkspace(workspace_id, user_email);
+    await this.chatService.checkUserInWorkspace(workspace_id, user_email);
 
     client.join(`workspace_${workspace_id}`);
     console.log(`User ${user_email} joined workspace ${workspace_id}`);
