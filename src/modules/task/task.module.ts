@@ -11,6 +11,7 @@ import { UserModule } from '../user/user.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ChatModule } from '../chat/chat.module';
 import { TaskCronService } from './task-cron.service';
+import { WorkspaceModule } from '../workspace/workspace.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TaskCronService } from './task-cron.service';
     forwardRef(() => UserModule),
     NotificationModule,
     ChatModule,
+    WorkspaceModule
   ],
   controllers: [TaskController],
   providers: [TaskService, CloudinaryProvider, TaskCronService],

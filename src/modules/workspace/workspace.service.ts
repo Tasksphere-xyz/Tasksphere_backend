@@ -48,6 +48,16 @@ export class WorkspaceService {
     return membership;
   }
 
+  public async checkUserInWorkspace(workspace_id: number, email: string) {
+    const membership = await this.workspaceMembershipRepository.findOne({
+      where: { workspace_id, email, status: 'accepted' },
+    });
+    if (!membership) {
+      throw new ForbiddenException('User is not a member of this workspace.');
+    }
+    return membership;
+  }
+
   async createWorkspace(createWorkspaceDto: CreateWorkspaceDto, user: UserPayload) {
     const { workspace_name, description } = createWorkspaceDto;
 
@@ -80,10 +90,9 @@ export class WorkspaceService {
     });
     if (!workspace) throw new NotFoundException('Workspace not found');
 
-    const inviter = await this.checkWorkspaceMembership(
+    const inviter = await this.checkUserInWorkspace(
       workspace_id,
       user.email,
-      'accepted',
     );
 
     if (!inviter || (inviter.role !== 'owner' && inviter.role !== 'admin')) {
@@ -95,7 +104,7 @@ export class WorkspaceService {
     const invitedMembers: string[] = [];
 
     for (const email of emails) {
-      const existingMembership = await this.checkWorkspaceMembership(
+      const existingMembership = await this.checkUserInWorkspace(
         workspace_id,
         email,
       );
@@ -114,7 +123,7 @@ export class WorkspaceService {
       await this.emailService.sendEmail(
         email,
         'Invitation to join Workspace',
-        `<span class="math-inline">\{inviter\.email\} has invited you to join '</span>{workspace.workspace_name}'. Click <a href="#">here</a> to accept the invitation.`,
+        `${inviter.email} has invited you to join '${workspace.workspace_name}'. Click <a href="#">here</a> to accept the invitation.`,
       );
 
       invitedMembers.push(email);
@@ -122,7 +131,7 @@ export class WorkspaceService {
 
     const message = `${invitedMembers.length} ${
       invitedMembers.length > 1 ? 'Users' : 'User'
-    } invited to workspace successfully`; 
+    } invited to workspace successfully`;
 
     return createResponse(true, message, {
       existingMembers,
@@ -185,14 +194,12 @@ export class WorkspaceService {
       throw new NotFoundException('Workspace not found');
     }
 
-    const invitation = await this.checkWorkspaceMembership(
-      workspace_id,
-      user.email,
-      'pending',
-    );
+    const invitation = await this.workspaceMembershipRepository.findOne({
+      where: { workspace_id, email: user.email, status: 'pending' },
+    });
 
     if (!invitation) {
-      throw new ForbiddenException('You are not invited to this workspace'); 
+      throw new ForbiddenException('You are not invited to this workspace or your invitation has expired/been declined.');
     }
 
     invitation.status = 'accepted';
@@ -205,7 +212,7 @@ export class WorkspaceService {
             arrayOfEmail,
             NotificationType.NEW_MEMBER,
             'New Member Joined',
-            `<span class="math-inline">\{invitedUser\.username\} has joined the workspace\: '</span>{workspace.workspace_name}'`,
+            `${invitedUser.username} has joined the workspace: '${workspace.workspace_name}'`,
         );
     }
 

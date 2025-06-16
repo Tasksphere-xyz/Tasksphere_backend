@@ -2,9 +2,10 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
+  UnauthorizedException
 } from '@nestjs/common';
 import { UserPayload } from 'express';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -23,6 +24,8 @@ import { UserService } from '../user/user.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from 'src/entities/notification.entity';
 import { ChatService } from '../chat/chat.service';
+import { WorkspaceService } from '../workspace/workspace.service';
+import { Workspace } from 'src/entities/workspace.entity';
 
 @Injectable()
 export class TaskService {
@@ -31,14 +34,20 @@ export class TaskService {
     private taskRepository: Repository<Task>,
     @InjectRepository(Activity)
     private activityRepository: Repository<Activity>,
+    @InjectRepository(Workspace)
+    private workspaceRepository: Repository<Workspace>,
     private readonly cloudinaryProvider: CloudinaryProvider,
     private readonly userService: UserService,
     private readonly notificationService: NotificationService,
     private readonly chatService: ChatService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   public async findTaskById(id: number): Promise<Task> {
-    const task = await this.taskRepository.findOne({ where: { id } });
+    const task = await this.taskRepository.findOne({
+        where: { id },
+        relations: ['workspace'],
+    });
 
     if (!task) {
       throw new NotFoundException(`Task not found`);
@@ -75,9 +84,32 @@ export class TaskService {
     createTaskDto: CreateTaskDto,
     filePath: string,
   ) {
-    const { title, priority, description, assigned_to, start_date, due_date } =
-      createTaskDto;
+    const {
+      title,
+      priority,
+      description,
+      assigned_to,
+      start_date,
+      due_date,
+      workspace_id,
+    } = createTaskDto;
+
     const foundUser = await this.userService.findUserByEmail(user.email);
+
+    // Validate if the creator is a member of the specified workspace
+    await this.workspaceService.checkUserInWorkspace(workspace_id, user.email);
+
+    let assignedUserEmail: string | null = null;
+    if (assigned_to) {
+        const assignedUser = await this.userService.findUserById(assigned_to);
+        if (!assignedUser) {
+            throw new NotFoundException('Assigned user not found.');
+        }
+        // Validate if the assigned user is also a member of the workspace
+        await this.workspaceService.checkUserInWorkspace(workspace_id, assignedUser.email);
+        assignedUserEmail = assignedUser.email;
+    }
+
     let attachmentUrl: string = '';
 
     if (filePath) {
@@ -107,6 +139,7 @@ export class TaskService {
 
     const newTask = this.taskRepository.create({
       user_id: foundUser.id,
+      workspace_id,
       title,
       status: 'pending',
       priority,
@@ -119,9 +152,9 @@ export class TaskService {
 
     await this.taskRepository.save(newTask);
 
-    if (assigned_to) {
-      const assignedUser = await this.userService.findUserById(assigned_to);
-
+    // Send notification to assigned user
+    if (assigned_to && assignedUserEmail) { // Use assignedUserEmail for notification
+      const assignedUser = await this.userService.findUserById(assigned_to); // Re-fetch or use existing assignedUser object if passed
       await this.notificationService.sendNotification(
         [assignedUser.email],
         NotificationType.ASSIGNED_TASK,
@@ -132,6 +165,7 @@ export class TaskService {
       );
     }
 
+    // Send notification to mentioned users in description
     if (description) {
       await this.chatService.sendNotificationToMentionedUsers(
         'task',
@@ -145,12 +179,19 @@ export class TaskService {
     });
   }
 
-  public async getTaskById(taskId: number) {
-    const task = await this.taskRepository.findOne({ where: { id: taskId } });
+  public async getTaskById(taskId: number, userEmail: string) { // Added userEmail for authorization
+    const task = await this.taskRepository.findOne({
+        where: { id: taskId },
+        relations: ['workspace'], // Load workspace to check membership
+    });
 
     if (!task) {
-      throw new BadRequestException('Task not found');
+      throw new NotFoundException('Task not found');
     }
+
+    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
+
 
     const creator = await this.userService.findUserById(task.user_id);
     let assignee = null;
@@ -166,13 +207,38 @@ export class TaskService {
     });
   }
 
-  public async updateTask(taskId: number, updateData: Partial<CreateTaskDto>) {
+  public async updateTask(
+    taskId: number,
+    updateData: Partial<CreateTaskDto>,
+    userEmail: string, // Added userEmail for authorization
+    ) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
+      relations: ['workspace'], // Load workspace to check membership
     });
 
     if (!task) {
       throw new BadRequestException('Task not found');
+    }
+
+    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
+
+    // If assigned_to is being updated, validate new assignee's membership
+    if (updateData.assigned_to !== undefined && updateData.assigned_to !== null && updateData.assigned_to !== task.assigned_to) {
+        const newAssignedUser = await this.userService.findUserById(updateData.assigned_to);
+        if (!newAssignedUser) {
+            throw new NotFoundException('New assigned user not found.');
+        }
+        await this.workspaceService.checkUserInWorkspace(task.workspace_id, newAssignedUser.email);
+
+        // Record activity for assignment change
+        await this.createActivity(
+            task.user_id, // User who made the change (creator of task) - adjust if actual modifier is needed
+            task.id,
+            'assignment',
+            `Task assigned from ${task.assigned_to ? (await this.userService.findUserById(task.assigned_to)).username : 'unassigned'} to ${newAssignedUser.username}`,
+        );
     }
 
     Object.assign(task, updateData);
@@ -181,13 +247,21 @@ export class TaskService {
     return createResponse(true, 'Task updated successfully', { task });
   }
 
-  public async deleteTask(taskId: number) {
+  public async deleteTask(taskId: number, userEmail: string) { // Added userEmail for authorization
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
+      relations: ['workspace'],
     });
 
     if (!task) {
       throw new BadRequestException('Task not found');
+    }
+
+    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
+
+    if (task.user_id !== (await this.userService.findUserByEmail(userEmail)).id) {
+        throw new ForbiddenException('You are not authorized to delete this task.');
     }
 
     await this.taskRepository.delete(taskId);
@@ -197,11 +271,15 @@ export class TaskService {
   public async duplicateTask(user: UserPayload, taskId: number) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
+      relations: ['workspace'],
     });
 
     if (!task) {
       throw new UnauthorizedException('Task not found');
     }
+
+    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, user.email);
 
     const foundUser = await this.userService.findUserByEmail(user.email);
 
@@ -211,6 +289,7 @@ export class TaskService {
       createdAt: undefined,
       updatedAt: undefined,
       user_id: foundUser.id,
+      workspace_id: task.workspace_id,
       status: 'pending',
       title: `${task.title} (Copy)`,
     });
@@ -222,17 +301,26 @@ export class TaskService {
   public async updateTaskStatus(
     id: number,
     updateTaskStatusDto: UpdateTaskStatusDto,
+    userEmail: string, // Added userEmail for authorization
   ) {
-    const task = await this.findTaskById(id);
+    const task = await this.findTaskById(id); 
 
+    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
+
+    const oldStatus = task.status;
     task.status = updateTaskStatusDto.status;
     await this.taskRepository.save(task);
 
+    // Assuming the user who updates the status is the one whose ID is used for activity
+    const userWhoUpdated = await this.userService.findUserByEmail(userEmail);
+    if (!userWhoUpdated) throw new NotFoundException('User who updated task not found');
+
     await this.createActivity(
-      task.assigned_to,
+      userWhoUpdated.id, // Use the ID of the user who performed the action
       task.id,
       'status-change',
-      `Task status changed to '${task.status}'`,
+      `Task status changed from '${oldStatus}' to '${task.status}' by ${userWhoUpdated.username}`,
     );
 
     return createResponse(true, 'Task status updated successfully', {
@@ -241,7 +329,9 @@ export class TaskService {
   }
 
   public async getAllTasks(
+    userEmail: string,
     page: number = 1,
+    workspaceId?: number,
     assignedTo?: number,
     sortBy?: 'newest' | 'oldest' | 'due-date' | 'last-updated',
     status?: 'pending' | 'in-progress' | 'completed',
@@ -249,10 +339,29 @@ export class TaskService {
   ) {
     page = page > 0 ? page : 1;
     const limit = 10;
-
     const skip = (page - 1) * limit;
 
     const query = this.taskRepository.createQueryBuilder('task');
+
+    // IMPORTANT: If a workspaceId is provided, validate user's membership
+    if (workspaceId) {
+        await this.workspaceService.checkUserInWorkspace(workspaceId, userEmail);
+        query.andWhere('task.workspace_id = :workspaceId', { workspaceId });
+    } else {
+        // If no workspaceId is provided, get tasks from all workspaces the user is part of
+        const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
+            { email: userEmail, username: '', id: 0 } as UserPayload
+        );
+        if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
+            return createResponse(true, 'No tasks found across your workspaces', { tasks: [], totalPages: 1, currentPage: page });
+        }
+        const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
+        if (accessibleWorkspaceIds.length === 0) {
+            return createResponse(true, 'No tasks found as user is not part of any workspace.', { tasks: [], totalPages: 1, currentPage: page });
+        }
+        query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
+    }
+
 
     if (assignedTo) {
       query.andWhere('task.assigned_to = :assignedTo', { assignedTo });
@@ -278,6 +387,9 @@ export class TaskService {
         break;
       case 'last-updated':
         query.orderBy('task.updatedAt', 'DESC');
+        break;
+      default: // Default sort if none provided
+        query.orderBy('task.createdAt', 'DESC');
         break;
     }
 
@@ -308,7 +420,9 @@ export class TaskService {
   }
 
   public async getAllTaskHistory(
+    userEmail: string,
     page: number = 1,
+    workspaceId?: number,
     assignedTo?: number,
     action?: 'status-change' | 'assignment',
     from?: string,
@@ -319,6 +433,28 @@ export class TaskService {
     const skip = (page - 1) * limit;
 
     const query = this.activityRepository.createQueryBuilder('task_activity');
+
+    // Join with Task entity to filter by workspace_id
+    query.innerJoin(Task, 'task', 'task_activity.task_id = task.id');
+
+    if (workspaceId) {
+        await this.workspaceService.checkUserInWorkspace(workspaceId, userEmail);
+        query.andWhere('task.workspace_id = :workspaceId', { workspaceId });
+    } else {
+        // If no workspaceId, get history from all workspaces user is part of
+        const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
+            { email: userEmail, username: '', id: 0 } as UserPayload
+        );
+        if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
+            return createResponse(true, 'No task history found across your workspaces', { history: [], totalPages: 1, currentPage: page });
+        }
+        const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
+        if (accessibleWorkspaceIds.length === 0) {
+            return createResponse(true, 'No task history found as user is not part of any workspace.', { history: [], totalPages: 1, currentPage: page });
+        }
+        query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
+    }
+
 
     if (assignedTo !== undefined && assignedTo !== null) {
       query.andWhere('task_activity.user_id = :assignedTo', { assignedTo });

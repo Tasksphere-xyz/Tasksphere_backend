@@ -41,16 +41,6 @@ export class ChatService {
     private readonly workspaceService: WorkspaceService,
   ) {}
 
-  public async checkUserInWorkspace(workspace_id: number, email: string) {
-    const membership = await this.workspaceMembershipRepository.findOne({
-      where: { workspace_id, email, status: 'accepted' },
-    });
-    if (!membership) {
-      throw new ForbiddenException('User is not a member of this workspace.');
-    }
-    return membership;
-  }
-
   public getFirstFiveWords(text: string): string {
     const words = text.split(/\s+/);
     const firstFive = words.slice(0, 5);
@@ -108,9 +98,9 @@ export class ChatService {
   async sendMessage(sender_email: string, sendMessageDto: SendMessageDto) {
     const { receiver_email, workspace_id, message, fileUrl } = sendMessageDto;
 
-    await this.checkUserInWorkspace(workspace_id, sender_email);
+    await this.workspaceService.checkUserInWorkspace(workspace_id, sender_email);
 
-    await this.checkUserInWorkspace(workspace_id, receiver_email);
+    await this.workspaceService.checkUserInWorkspace(workspace_id, receiver_email);
 
     // Save message
     const newMessage = this.chatRepository.create({
@@ -132,8 +122,8 @@ export class ChatService {
     receiver_email: string,
     workspace_id: number,
   ) {
-    await this.checkUserInWorkspace(workspace_id, sender_email);
-    await this.checkUserInWorkspace(workspace_id, receiver_email);
+    await this.workspaceService.checkUserInWorkspace(workspace_id, sender_email);
+    await this.workspaceService.checkUserInWorkspace(workspace_id, receiver_email);
 
     const messages = await this.chatRepository.find({
       where: [
@@ -255,7 +245,7 @@ export class ChatService {
   ) {
     const { workspace_id, message, fileUrl } = sendWorkspaceMessageDto;
 
-    await this.checkUserInWorkspace(workspace_id, sender_email); // Ensure sender is member
+    await this.workspaceService.checkUserInWorkspace(workspace_id, sender_email);
 
     const newMessage = this.workspaceMessageRepository.create({
       sender_email,
@@ -290,7 +280,7 @@ export class ChatService {
   }
 
   async getWorkspaceMessages(workspace_id: number, sender_email: string) {
-    await this.checkUserInWorkspace(workspace_id, sender_email); // Ensure user is member
+    await this.workspaceService.checkUserInWorkspace(workspace_id, sender_email);
 
     const workspaceMessages = await this.workspaceMessageRepository.find({
       where: { workspace_id },

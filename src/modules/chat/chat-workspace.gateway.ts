@@ -12,6 +12,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { UsePipes, ValidationPipe } from '@nestjs/common';
 import { ApiExtraModels, ApiTags } from '@nestjs/swagger';
 import { SendWorkspaceMessageDto } from './dto/send-workspace-message.dto';
+import { WorkspaceService } from '../workspace/workspace.service';
 
 @ApiTags('WebSocket Workspace Chat')
 @ApiExtraModels(SendMessageDto)
@@ -20,7 +21,10 @@ export class ChatWorkspaceGateway {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   // When a client connects
   handleConnection(client: Socket) {
@@ -59,7 +63,7 @@ export class ChatWorkspaceGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const user_email = client.handshake.auth.email;
-    await this.chatService.checkUserInWorkspace(workspace_id, user_email);
+    await this.workspaceService.checkUserInWorkspace(workspace_id, user_email);
 
     client.join(`workspace_${workspace_id}`);
     console.log(`User ${user_email} joined workspace ${workspace_id}`);

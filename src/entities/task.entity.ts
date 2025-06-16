@@ -1,48 +1,57 @@
 /* eslint-disable prettier/prettier */
 import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-  } from 'typeorm';
-  
-  @Entity('tasks')
-  export class Task {
-    @PrimaryGeneratedColumn()
-    id: number;
-  
-    @Column()
-    user_id: number;
-  
-    @Column()
-    title: string;
-  
-    @Column()
-    status: 'pending' | 'in-progress' | 'completed';
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { Workspace } from './workspace.entity';
 
-    @Column()
-    priority: 'low' | 'medium' | 'high' | 'urgent';
+@Entity('tasks')
+export class Task {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column({ nullable: true })
-    description?: string;
-  
-    @Column({ nullable: true })
-    assigned_to?: number;
+  @Column()
+  user_id: number;
 
-    @Column({ nullable: true })
-    attachment?: string;
+  @Column()
+  workspace_id: number;
 
-    @CreateDateColumn({ nullable: true })
-    start_date: Date;
+  @ManyToOne(() => Workspace)
+  @JoinColumn({ name: 'workspace_id' })
+  workspace: Workspace;
 
-    @CreateDateColumn({ nullable: true })
-    due_date: Date;
-  
-    @CreateDateColumn({ nullable: false })
-    createdAt: Date;
-  
-    @UpdateDateColumn({ nullable: false })
-    updatedAt: Date;
-  }
-  
+  @Column()
+  title: string;
+
+  @Column()
+  status: 'pending' | 'in-progress' | 'completed';
+
+  @Column()
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+
+  @Column({ nullable: true })
+  description?: string;
+
+  @Column({ nullable: true })
+  assigned_to?: number; // User assigned to the task
+
+  @Column({ nullable: true })
+  attachment?: string;
+
+  @CreateDateColumn({ nullable: true })
+  start_date: Date;
+
+  @CreateDateColumn({ nullable: true })
+  due_date: Date;
+
+  @CreateDateColumn({ nullable: false })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: false })
+  updatedAt: Date;
+}

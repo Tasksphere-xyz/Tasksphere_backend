@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
@@ -10,6 +11,11 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateTaskDto {
+  @ApiProperty({ description: 'ID of the workspace this task belongs to' })
+  @IsNotEmpty()
+  @IsNumber()
+  workspace_id: number;
+  
   @ApiProperty({ description: 'Title of the task' })
   @IsNotEmpty()
   @IsString()

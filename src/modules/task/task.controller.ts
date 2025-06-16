@@ -42,7 +42,7 @@ export class TaskController {
   @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Task created successfully' })
-  @ApiResponse({ status: 400, description: '' })
+  @ApiResponse({ status: 400, description: 'Invalid data or user not in workspace' }) // Updated description
   @UseInterceptors(FileInterceptor('attachment', multerConfig))
   async createTask(
     @Req() req: Request & { user: UserPayload },
@@ -61,30 +61,48 @@ export class TaskController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Task retrieved successfully' })
-  async getTask(@Param('id') id: number) {
-    return await this.taskService.getTaskById(id);
+  @ApiResponse({ status: 403, description: 'User not authorized to access task' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  @ApiParam({ name: 'id', description: 'ID of the task' })
+  async getTask(
+    @Param('id') id: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    return await this.taskService.getTaskById(id, req.user.email);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Task updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid data or task not found' })
+  @ApiResponse({ status: 403, description: 'User not authorized to update task' })
+  @ApiParam({ name: 'id', description: 'ID of the task' })
   async updateTask(
     @Param('id') id: number,
     @Body() updateData: Partial<CreateTaskDto>,
+    @Req() req: Request & { user: UserPayload },
   ) {
-    return await this.taskService.updateTask(id, updateData);
+    return await this.taskService.updateTask(id, updateData, req.user.email);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Task deleted successfully' })
-  async deleteTask(@Param('id') id: number) {
-    return await this.taskService.deleteTask(id);
+  @ApiResponse({ status: 400, description: 'Task not found' })
+  @ApiResponse({ status: 403, description: 'User not authorized to delete task' })
+  @ApiParam({ name: 'id', description: 'ID of the task' })
+  async deleteTask(
+    @Param('id') id: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    return await this.taskService.deleteTask(id, req.user.email);
   }
 
   @Post(':id/duplicate')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Task duplicated successfully' })
+  @ApiResponse({ status: 403, description: 'User not authorized to duplicate task' })
+  @ApiParam({ name: 'id', description: 'ID of the task to duplicate' })
   async duplicateTask(
     @Req() req: Request & { user: UserPayload },
     @Param('id') id: number,
@@ -95,13 +113,15 @@ export class TaskController {
   @Patch('status/:id')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Task status updated successfully' })
-  @ApiResponse({ status: 400, description: 'Task not found' })
+  @ApiResponse({ status: 400, description: 'Task not found or invalid status' })
+  @ApiResponse({ status: 403, description: 'User not authorized to update task status' })
   @ApiParam({ name: 'id', description: 'ID of the task to be updated' })
   async updateTaskStatus(
     @Param('id') id: string,
     @Body() updateTaskStatusDto: UpdateTaskStatusDto,
+    @Req() req: Request & { user: UserPayload },
   ) {
-    return this.taskService.updateTaskStatus(Number(id), updateTaskStatusDto);
+    return this.taskService.updateTaskStatus(Number(id), updateTaskStatusDto, req.user.email);
   }
 
   @Get('/')
@@ -109,9 +129,15 @@ export class TaskController {
   @ApiResponse({ status: 200, description: 'Tasks retrieved successfully' })
   @ApiQuery({
     name: 'page',
-    required: true,
+    required: false,
     type: Number,
     description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'workspaceId',
+    required: false,
+    type: Number,
+    description: 'ID of the workspace to filter tasks by. If not provided, tasks from all user workspaces are returned.',
   })
   @ApiQuery({
     name: 'assignedTo',
@@ -138,7 +164,9 @@ export class TaskController {
     description: 'Filter by priority',
   })
   async getAllTasks(
-    @Query('page') page: number,
+    @Req() req: Request & { user: UserPayload },
+    @Query('page') page: number = 1,
+    @Query('workspaceId') workspaceId?: number,
     @Query('assignedTo') assignedTo?: number,
     @Query('sortBy')
     sortBy: 'newest' | 'oldest' | 'due-date' | 'last-updated' = 'newest',
@@ -146,7 +174,9 @@ export class TaskController {
     @Query('priority') priority?: 'low' | 'medium' | 'high' | 'urgent',
   ) {
     return this.taskService.getAllTasks(
+      req.user.email,
       page,
+      workspaceId,
       assignedTo,
       sortBy,
       status,
@@ -162,9 +192,15 @@ export class TaskController {
   })
   @ApiQuery({
     name: 'page',
-    required: true,
+    required: false,
     type: Number,
     description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'workspaceId',
+    required: false,
+    type: Number,
+    description: 'ID of the workspace to filter task history by. If not provided, history from all user workspaces are returned.',
   })
   @ApiQuery({
     name: 'assignedTo',
@@ -191,14 +227,18 @@ export class TaskController {
     description: 'End date (YYYY-MM-DD)',
   })
   async getTaskHistory(
-    @Query('page') page: number,
+    @Req() req: Request & { user: UserPayload },
+    @Query('page') page: number = 1,
+    @Query('workspaceId') workspaceId?: number,
     @Query('assignedTo') assignedTo?: number,
     @Query('action') action?: 'status-change' | 'assignment',
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     return this.taskService.getAllTaskHistory(
+      req.user.email,
       page,
+      workspaceId,
       assignedTo,
       action,
       from,
@@ -207,8 +247,8 @@ export class TaskController {
   }
 
   @Post('cron/task-deadline-notification')
-  async triggerPaymentCron() {
+  async triggerTaskDeadlineCron() {
     await this.taskCronService.notifyTaskDeadlines();
-    return 'Cron job executed manually';
+    return 'Task deadline cron job executed manually';
   }
 }
