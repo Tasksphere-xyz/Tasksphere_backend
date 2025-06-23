@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsArray, IsEmail } from 'class-validator';
 
 export class CreateWorkspaceDto {
     @ApiProperty({ description: 'name of the workspace' })
@@ -8,8 +8,13 @@ export class CreateWorkspaceDto {
     @IsString()
     workspace_name: string;
 
-    @ApiProperty({ description: 'description of the workspace' })
-    @IsOptional()
-    @IsString()
-    description?: string;
+    @ApiProperty({
+        description: 'Array of emails to invite to the workspace',
+        type: [String],
+        example: ['user1@example.com', 'user2@example.com']
+    })
+    @IsArray()
+    @IsEmail({}, { each: true })
+    @IsNotEmpty({ each: true })
+    emails: string[];
 }

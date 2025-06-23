@@ -59,17 +59,18 @@ export class WorkspaceService {
   }
 
   async createWorkspace(createWorkspaceDto: CreateWorkspaceDto, user: UserPayload) {
-    const { workspace_name, description } = createWorkspaceDto;
+    const { workspace_name, emails } = createWorkspaceDto; // Destructure emails
 
     const newWorkspace = await this.workspaceRepository.save({
       workspace_name,
-      description,
+      // description is no longer here
     });
 
     if (!newWorkspace) {
       throw new BadRequestException('Failed to create workspace');
     }
 
+    // Add the creator as the owner
     await this.workspaceMembershipRepository.save({
       workspace_id: newWorkspace.id,
       email: user.email,
@@ -77,7 +78,44 @@ export class WorkspaceService {
       role: 'owner',
     });
 
-    return createResponse(true, 'Workspace created successfully', { newWorkspace });
+    const invitedMembers: string[] = [];
+    const alreadyMembersOrInvited: string[] = [];
+
+    // Invite users from the provided emails array
+    for (const email of emails) {
+        // Prevent inviting the creator if their email is in the list
+        if (email === user.email) {
+            alreadyMembersOrInvited.push(email);
+            continue;
+        }
+
+        const existingMembership = await this.workspaceMembershipRepository.findOne({
+            where: { workspace_id: newWorkspace.id, email },
+        });
+
+        if (existingMembership) {
+            alreadyMembersOrInvited.push(email);
+            continue;
+        }
+
+        await this.workspaceMembershipRepository.save({
+            workspace_id: newWorkspace.id,
+            email,
+            status: 'pending',
+            role: 'member',
+        });
+
+        await this.emailService.sendEmail(
+            email,
+            'Invitation to join Workspace',
+            `${user.email} has invited you to join '${newWorkspace.workspace_name}'. Click <a href="#">here</a> to accept the invitation.`,
+        );
+        invitedMembers.push(email);
+    }
+
+    const message = `Workspace created successfully. ${invitedMembers.length} ${invitedMembers.length === 1 ? 'user' : 'users'} invited.`;
+
+    return createResponse(true, message, { newWorkspace, invitedMembers, alreadyMembersOrInvited });
   }
 
   async inviteUserToWorkspace(
