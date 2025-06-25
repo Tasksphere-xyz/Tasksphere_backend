@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -60,16 +60,16 @@ export class AuthService {
     const user = await this.userRepository.findOne({ where: { email } });
   
     if (!user || !user.password) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
   
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
   
     const token = this.jwtService.sign({ email: user.email });
 
-    return createResponse(true, 'Sign up successful', { access_token: token, user });
+    return createResponse(true, 'Sign in successful', { access_token: token, user });
   }
 }
