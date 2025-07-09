@@ -58,12 +58,12 @@ export class WorkspaceService {
     return membership;
   }
 
-  async createWorkspace(createWorkspaceDto: CreateWorkspaceDto, user: UserPayload) {
+  async createWorkspace(contractId: string, createWorkspaceDto: CreateWorkspaceDto, user: UserPayload) {
     const { workspace_name, emails } = createWorkspaceDto; // Destructure emails
 
     const newWorkspace = await this.workspaceRepository.save({
       workspace_name,
-      // description is no longer here
+      contractId
     });
 
     if (!newWorkspace) {

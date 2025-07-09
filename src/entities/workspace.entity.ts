@@ -16,6 +16,9 @@ export class Workspace {
   workspace_name: string;
 
   @Column({ nullable: true })
+  contractId?: string;
+
+  @Column({ nullable: true })
   description?: string;
 
   @CreateDateColumn({ nullable: false })

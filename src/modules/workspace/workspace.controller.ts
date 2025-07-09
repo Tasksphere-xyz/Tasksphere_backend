@@ -21,16 +21,18 @@ import { UserPayload } from 'express';
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
 
-  @Post('create')
+  @Post('create/:contractId')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Workspace created successfully' })
   @ApiResponse({ status: 400, description: 'Failed to create workspace' })
+  @ApiParam({ name: 'contractId', description: 'id of the contract' })
   async createWorkspace(
+    @Param('contractId') contractId: string,
     @Body() createWorkspaceDto: CreateWorkspaceDto,
     @Req() req: Request & { user: UserPayload },
   ) {
     const user = req.user;
-    return await this.workspaceService.createWorkspace(createWorkspaceDto, user);
+    return await this.workspaceService.createWorkspace(contractId, createWorkspaceDto, user);
   }
 
   @Post(':workspaceId/invite')
