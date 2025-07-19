@@ -14,6 +14,7 @@ import { unlinkSavedFile } from 'src/utils/unlinkImage.util';
 import { Task } from 'src/entities/task.entity';
 import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { Activity } from 'src/entities/activity.entity';
+import { BindWalletDto } from './dto/bind-wallet.dto';
 
 @Injectable()
 export class UserService {
@@ -120,10 +121,9 @@ export class UserService {
         }),
       ]);
 
-    // Extract workspace names from memberships
-    const workspaceNames = workspaceMemberships.map(
-      (membership) => membership.workspace_id,
-    );
+      const contractIds = workspaceMemberships.map(
+        (membership) => membership.workspace?.contractId,
+      );      
 
     return createResponse(true, 'User profile retrieved successfully', {
       user: {
@@ -137,7 +137,7 @@ export class UserService {
         tasksInProgress,
         completedTasks,
       },
-      workspaces: workspaceNames,
+      workspaces: contractIds,
     });
   }
 
@@ -169,4 +169,21 @@ export class UserService {
       currentPage: page,
     });
   }
+
+  async bindWallet(dto: BindWalletDto, user: UserPayload) {
+    const foundUser = await this.findUserByEmail(user.email);
+  
+    if (!foundUser) {
+      throw new NotFoundException('User not found');
+    }
+  
+    foundUser.wallet_address = dto.wallet_address;
+  
+    await this.userRepository.save(foundUser);
+  
+    return createResponse(true, 'Wallet address updated successfully', {
+      wallet_address: foundUser.wallet_address,
+    });
+  }
+  
 }

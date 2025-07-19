@@ -18,6 +18,7 @@ import { EmailService } from 'src/common/email/email.service';
 import { NotificationService } from '../notification/notification.service';
 import { UserService } from '../user/user.service';
 import { NotificationType } from 'src/entities/notification.entity';
+import { Task } from 'src/entities/task.entity';
 
 @Injectable()
 export class WorkspaceService {
@@ -26,6 +27,8 @@ export class WorkspaceService {
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(WorkspaceMembership) 
     private workspaceMembershipRepository: Repository<WorkspaceMembership>,
+    @InjectRepository(Task) 
+    private taskRepository: Repository<Task>,
     private emailService: EmailService,
     private readonly notificationService: NotificationService,
     private readonly userService: UserService,
@@ -185,14 +188,14 @@ export class WorkspaceService {
     page = page > 0 ? page : 1;
     const limit = 10;
     const skip = (page - 1) * limit;
-
+  
     const workspace = await this.workspaceRepository.findOne({
       where: { id: workspace_id },
     });
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
-
+  
     const userMembership = await this.checkWorkspaceMembership(
       workspace_id,
       user.email,
@@ -200,28 +203,93 @@ export class WorkspaceService {
     if (!userMembership) {
       throw new ForbiddenException('Not a member of the workspace');
     }
-
-    const [members, total] =
-      await this.workspaceMembershipRepository.findAndCount({ 
-        where: { workspace_id },
-        order: { createdAt: 'DESC' },
-        skip,
-        take: limit,
-      });
-
+  
+    const { raw } = await this.workspaceMembershipRepository
+      .createQueryBuilder('membership')
+      .leftJoin('user', 'user', 'user.email = membership.email')
+      .select([
+        'membership.email AS membership_email',
+        'membership.role AS membership_role',
+        'membership.status AS membership_status',
+        'membership.createdAt AS membership_createdAt',
+        'user.username AS user_username',
+        'user.wallet_address AS user_wallet_address',
+        'user.displayPic AS user_displayPic',
+      ])
+      .where('membership.workspace_id = :workspaceId', { workspaceId: workspace_id })
+      .orderBy('membership.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getRawAndEntities();
+  
+    const total = await this.workspaceMembershipRepository.count({
+      where: { workspace_id },
+    });
+  
+    const formattedMembers = raw.map((row) => ({
+      email: row.membership_email,
+      role: row.membership_role,
+      username: row.user_username,
+      wallet_address: row.user_wallet_address,
+      displayPic: row.user_displayPic,
+      isOwner: row.membership_role === 'owner',
+    }));
+  
     const totalPages = Math.ceil(total / limit);
-
+  
     const message =
-      members.length === 0
+      formattedMembers.length === 0
         ? 'No team members found'
         : 'Team members retrieved successfully';
-
+  
     return createResponse(true, message, {
-      members,
+      members: formattedMembers,
       totalPages: totalPages === 0 ? 1 : totalPages,
       currentPage: page,
     });
+  }  
+
+  async getWorkspaceDetails(contractId: string) {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { contractId },
+    });
+  
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+  
+    const [totalTasks, completedTasks, inProgressTasks, overdueTasks] = await Promise.all([
+      this.taskRepository.count({
+        where: { workspace_id: workspace.id },
+      }),
+      this.taskRepository.count({
+        where: { workspace_id: workspace.id, status: 'completed' },
+      }),
+      this.taskRepository.count({
+        where: { workspace_id: workspace.id, status: 'in-progress' },
+      }),
+      this.taskRepository
+        .createQueryBuilder('task')
+        .where('task.workspace_id = :workspaceId', { workspaceId: workspace.id })
+        .andWhere('task.status != :completed', { completed: 'completed' })
+        .andWhere('task.due_date < NOW()')
+        .getCount(),
+    ]);
+  
+    const overview = {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      overdueTasks,
+    };
+  
+    return createResponse(true, 'Workspace fetched successfully', {
+      workspace,
+      overview,
+    });
   }
+  
+  
 
   async joinWorkspace(workspace_id: number, user: UserPayload) {
     const workspace = await this.workspaceRepository.findOne({

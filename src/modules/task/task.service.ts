@@ -80,6 +80,7 @@ export class TaskService {
   }
 
   public async createTask(
+    contractId: string,
     user: UserPayload,
     createTaskDto: CreateTaskDto,
     filePath: string,
@@ -140,6 +141,7 @@ export class TaskService {
     const newTask = this.taskRepository.create({
       user_id: foundUser.id,
       workspace_id,
+      contractId,
       title,
       status: 'pending',
       priority,

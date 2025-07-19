@@ -78,6 +78,20 @@ export class WorkspaceController {
     return this.workspaceService.getWorkspaceMembers(workspaceId, user, page);
   }
 
+  @Get(':contractId')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Workspace fetched successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Workspace not found' })
+  @ApiParam({ name: 'contractId', description: 'contractId of the workspace' })
+  async getWorkspace(
+    @Param('contractId') contractId: string
+  ) {
+    return this.workspaceService.getWorkspaceDetails(contractId);
+  }
+
   @Post(':workspaceId/join')
   @UseGuards(JwtAuthGuard)
   @ApiResponse({

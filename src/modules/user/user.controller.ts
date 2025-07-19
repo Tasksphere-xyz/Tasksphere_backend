@@ -10,6 +10,7 @@ import {
   UploadedFile,
   Get,
   Query,
+  Post,
 } from '@nestjs/common';
 import { ApiConsumes, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -18,6 +19,7 @@ import { UserPayload } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from 'src/utils/multer.util';
+import { BindWalletDto } from './dto/bind-wallet.dto';
 
 @ApiTags('user')
 @Controller('user')
@@ -48,6 +50,24 @@ export class UserController {
       updateUserDto,
       user,
       filePath,
+    );
+  }
+
+  @Post('bindWallet')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Wallet adddress updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'User not found' })
+  async bindWalletAddress(
+    @Body() bindWalletDto: BindWalletDto,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const user = req.user;
+    return await this.userService.bindWallet(
+      bindWalletDto,
+      user
     );
   }
 

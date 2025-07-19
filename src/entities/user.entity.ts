@@ -24,6 +24,9 @@ export class User {
   googleId: string;
 
   @Column({ nullable: true })
+  wallet_address?: string;
+
+  @Column({ nullable: true })
   password: string;
 
   @CreateDateColumn({ nullable: false })

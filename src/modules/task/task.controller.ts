@@ -38,13 +38,15 @@ export class TaskController {
     private readonly taskCronService: TaskCronService,
   ) {}
 
-  @Post('create')
+  @Post('create/:contractId')
   @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Task created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid data or user not in workspace' }) // Updated description
+  @ApiParam({ name: 'contractId', description: 'id of the contract' })
   @UseInterceptors(FileInterceptor('attachment', multerConfig))
   async createTask(
+    @Param('contractId') contractId: string,
     @Req() req: Request & { user: UserPayload },
     @Body() createTaskDto: CreateTaskDto,
     @UploadedFile() file: Express.Multer.File,
@@ -55,7 +57,7 @@ export class TaskController {
     if (file) {
       filePath = file.path;
     }
-    return await this.taskService.createTask(user, createTaskDto, filePath);
+    return await this.taskService.createTask(contractId, user, createTaskDto, filePath);
   }
 
   @Get(':id')
