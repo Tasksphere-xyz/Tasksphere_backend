@@ -8,10 +8,11 @@ import { WorkspaceMembership } from 'src/entities/workspace-membership.entity';
 import { EmailService } from 'src/common/email/email.service';
 import { NotificationModule } from '../notification/notification.module';
 import { UserModule } from '../user/user.module';
+import { Task } from 'src/entities/task.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace, WorkspaceMembership]),
+    TypeOrmModule.forFeature([Workspace, WorkspaceMembership, Task]),
     NotificationModule,
     forwardRef(() => UserModule),
   ],
