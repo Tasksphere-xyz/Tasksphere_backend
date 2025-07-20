@@ -208,6 +208,7 @@ export class WorkspaceService {
       .createQueryBuilder('membership')
       .leftJoin('user', 'user', 'user.email = membership.email')
       .select([
+        'membership.id AS membership_id', // required
         'membership.email AS membership_email',
         'membership.role AS membership_role',
         'membership.status AS membership_status',
