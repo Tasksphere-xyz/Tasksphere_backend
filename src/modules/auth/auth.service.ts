@@ -39,7 +39,7 @@ export class AuthService {
   }
 
   async signup(signupDto: SignupDto) {
-    const { email, username, password } = signupDto;
+    const { email, username, password, wallet_address } = signupDto;
   
     const existingUser = await this.userRepository.findOne({ where: { email } });
     if (existingUser) {
@@ -47,7 +47,13 @@ export class AuthService {
     }
   
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = this.userRepository.create({ email, username, password: hashedPassword });
+    const user = this.userRepository.create({
+      email,
+      username,
+      password: hashedPassword,
+      wallet_address,
+    });
+  
     await this.userRepository.save(user);
   
     const token = this.jwtService.sign({ email: user.email });

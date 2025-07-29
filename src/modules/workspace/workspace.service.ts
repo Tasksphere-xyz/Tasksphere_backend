@@ -213,6 +213,7 @@ export class WorkspaceService {
         'membership.role AS membership_role',
         'membership.status AS membership_status',
         'membership.createdAt AS membership_createdAt',
+        'user.id AS user_id',
         'user.username AS user_username',
         'user.wallet_address AS user_wallet_address',
         'user.displayPic AS user_displayPic',
@@ -228,6 +229,7 @@ export class WorkspaceService {
     });
   
     const formattedMembers = raw.map((row) => ({
+      id: row.user_id,
       email: row.membership_email,
       role: row.membership_role,
       username: row.user_username,
