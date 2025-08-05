@@ -352,18 +352,29 @@ export class TaskService {
         await this.workspaceService.checkUserInWorkspace(workspaceId, userEmail);
         query.andWhere('task.workspace_id = :workspaceId', { workspaceId });
     } else {
-        // If no workspaceId is provided, get tasks from all workspaces the user is part of
-        const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
-            { email: userEmail, username: '', id: 0 } as UserPayload
-        );
-        if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
-            return createResponse(true, 'No tasks found across your workspaces', { tasks: [], totalPages: 1, currentPage: page });
-        }
-        const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
-        if (accessibleWorkspaceIds.length === 0) {
-            return createResponse(true, 'No tasks found as user is not part of any workspace.', { tasks: [], totalPages: 1, currentPage: page });
-        }
-        query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
+      const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
+        { email: userEmail, username: '', id: 0 } as UserPayload
+      );
+      
+      if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
+          return createResponse(true, 'No tasks found across your workspaces', { 
+            tasks: [], 
+            totalPages: 1, 
+            currentPage: page 
+          });
+      }
+
+      const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
+      
+      if (accessibleWorkspaceIds.length === 0) {
+          return createResponse(true, 'No tasks found as user is not part of any workspace.', { 
+            tasks: [], 
+            totalPages: 1, 
+            currentPage: page 
+          });
+      }
+      
+      query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
     }
 
 
@@ -445,18 +456,29 @@ export class TaskService {
         await this.workspaceService.checkUserInWorkspace(workspaceId, userEmail);
         query.andWhere('task.workspace_id = :workspaceId', { workspaceId });
     } else {
-        // If no workspaceId, get history from all workspaces user is part of
-        const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
-            { email: userEmail, username: '', id: 0 } as UserPayload
-        );
-        if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
-            return createResponse(true, 'No task history found across your workspaces', { history: [], totalPages: 1, currentPage: page });
-        }
-        const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
-        if (accessibleWorkspaceIds.length === 0) {
-            return createResponse(true, 'No task history found as user is not part of any workspace.', { history: [], totalPages: 1, currentPage: page });
-        }
-        query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
+      const userWorkspaces = await this.workspaceService.getAllUserWorkspaces(
+          { email: userEmail, username: '', id: 0 } as UserPayload
+      );
+      
+      if (!userWorkspaces.data || !userWorkspaces.data.workspaces || userWorkspaces.data.workspaces.length === 0) {
+          return createResponse(true, 'No task history found across your workspaces', { 
+            history: [], 
+            totalPages: 1, 
+            currentPage: page 
+          });
+      }
+      
+      const accessibleWorkspaceIds = userWorkspaces.data.workspaces.map((ws: any) => ws.id);
+      
+      if (accessibleWorkspaceIds.length === 0) {
+          return createResponse(true, 'No task history found as user is not part of any workspace.', { 
+            history: [], 
+            totalPages: 1, 
+            currentPage: page 
+          });
+      }
+      
+      query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
     }
 
 

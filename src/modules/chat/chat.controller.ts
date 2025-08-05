@@ -50,7 +50,7 @@ export class ChatController {
   @ApiParam({ name: 'workspace_id', description: 'Workspace ID' })
   @ApiParam({ name: 'receiver_email', description: 'Receiver email' })
   async getMessages(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id') workspace_id: string,
     @Param('receiver_email') receiver_email: string,
     @Req() req: Request & { user: UserPayload },
   ) {
@@ -58,7 +58,7 @@ export class ChatController {
     return await this.chatService.getMessages(
       sender_email,
       receiver_email,
-      workspace_id,
+      Number(workspace_id),
     );
   }
 
@@ -95,11 +95,11 @@ export class ChatController {
   @ApiResponse({ status: 400, description: 'Messages not found' })
   @ApiParam({ name: 'workspace_id', description: 'Workspace ID' })
   async getWorkspaceMessages(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id') workspace_id: string,
     @Req() req: Request & { user: UserPayload },
   ) {
     const email = req.user.email;
-    return await this.chatService.getWorkspaceMessages(workspace_id, email);
+    return await this.chatService.getWorkspaceMessages(Number(workspace_id), email);
   }
 
   @Patch('pin/:message_id')

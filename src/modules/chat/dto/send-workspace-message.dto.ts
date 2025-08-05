@@ -1,14 +1,17 @@
 /* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
 
 export class SendWorkspaceMessageDto {
-  @ApiProperty({ description: 'Sender email', example: 'me@example.com' })
-  @IsString()
-  @IsNotEmpty()
-  sender_email: string;
-
   @ApiProperty({ description: 'Workspace ID', example: 1 })
+  @Transform(({ value }) => {
+    const num = Number(value);
+    if (isNaN(num)) {
+      throw new Error('workspace_id must be a valid number');
+    }
+    return num;
+  })
   @IsNumber()
   @IsNotEmpty()
   workspace_id: number;

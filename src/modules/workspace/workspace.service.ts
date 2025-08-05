@@ -356,8 +356,12 @@ export class WorkspaceService {
       throw new NotFoundException('No workspaces found');
     }
 
-    const userWorkspaces = workspaces.map((membership) => membership.workspace_id);
-
+    const userWorkspaces = workspaces.map((membership) => ({
+      id: membership.workspace_id,
+      name: membership.workspace.workspace_name,
+      contractId: membership.workspace.contractId,
+    }));
+  
     return createResponse(true, 'Workspaces retrieved successfully', {
       workspaces: userWorkspaces,
     });
