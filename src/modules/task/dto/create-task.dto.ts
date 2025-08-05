@@ -70,4 +70,12 @@ export class CreateTaskDto {
   @Type(() => Date)
   @IsDate()
   due_date: Date;
+
+  @ApiProperty({ 
+    description: 'Contract ID for the task on blockchain',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  taskContractId?: string;
 }

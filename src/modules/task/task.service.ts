@@ -93,6 +93,7 @@ export class TaskService {
       start_date,
       due_date,
       workspace_id,
+      taskContractId,
     } = createTaskDto;
 
     const foundUser = await this.userService.findUserByEmail(user.email);
@@ -142,6 +143,7 @@ export class TaskService {
       user_id: foundUser.id,
       workspace_id,
       contractId,
+      taskContractId,
       title,
       status: 'pending',
       priority,

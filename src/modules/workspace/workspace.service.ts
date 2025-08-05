@@ -130,50 +130,53 @@ export class WorkspaceService {
       where: { id: workspace_id },
     });
     if (!workspace) throw new NotFoundException('Workspace not found');
-
+  
     const inviter = await this.checkUserInWorkspace(
       workspace_id,
       user.email,
     );
-
+  
     if (!inviter || (inviter.role !== 'owner' && inviter.role !== 'admin')) {
       throw new ForbiddenException('Not authorized to invite users');
     }
-
+  
     const { emails } = inviteUserDto;
     const existingMembers: string[] = [];
     const invitedMembers: string[] = [];
-
+  
     for (const email of emails) {
-      const existingMembership = await this.checkUserInWorkspace(
+      // FIX: Use checkWorkspaceMembership instead of checkUserInWorkspace
+      // This checks for ANY membership status, not just 'accepted'
+      const existingMembership = await this.checkWorkspaceMembership(
         workspace_id,
         email,
       );
+      
       if (existingMembership) {
         existingMembers.push(email);
         continue;
       }
-
+  
       await this.workspaceMembershipRepository.save({
         workspace_id,
         email,
         status: 'pending',
         role: 'member',
       });
-
+  
       await this.emailService.sendEmail(
         email,
         'Invitation to join Workspace',
         `${inviter.email} has invited you to join '${workspace.workspace_name}'. Click <a href="#">here</a> to accept the invitation.`,
       );
-
+  
       invitedMembers.push(email);
     }
-
+  
     const message = `${invitedMembers.length} ${
       invitedMembers.length > 1 ? 'Users' : 'User'
     } invited to workspace successfully`;
-
+  
     return createResponse(true, message, {
       existingMembers,
       invitedMembers,

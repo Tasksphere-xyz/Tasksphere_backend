@@ -131,6 +131,7 @@ export class UserService {
         email: foundUser.email,
         username: foundUser.username,
         displayPic: foundUser.displayPic,
+        wallet_address: foundUser.wallet_address,
       },
       overview: {
         totalTasks,
