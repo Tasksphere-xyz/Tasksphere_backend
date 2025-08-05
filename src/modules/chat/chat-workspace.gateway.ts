@@ -39,17 +39,16 @@ export class ChatWorkspaceGateway {
   @SubscribeMessage('sendWorkspaceMessage')
   @UsePipes(new ValidationPipe())
   async handleSendWorkspaceMessage(
-    @MessageBody() data: Omit<SendWorkspaceMessageDto, 'sender_email'>,
+    @MessageBody() data: SendWorkspaceMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
     const sender_email = client.handshake.auth.email;
 
     const newMessage = await this.chatService.sendWorkspaceMessage(
       sender_email,
-      { ...data, sender_email },
+      { ...data },
     );
 
-    // Emit to all members of the workspace room
     this.server
       .to(`workspace_${data.workspace_id}`)
       .emit('receiveWorkspaceMessage', newMessage);
