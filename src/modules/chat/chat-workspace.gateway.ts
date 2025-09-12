@@ -46,7 +46,7 @@ export class ChatWorkspaceGateway {
 
     const newMessage = await this.chatService.sendWorkspaceMessage(
       sender_email,
-      { ...data },
+      data,
     );
 
     this.server
