@@ -121,9 +121,11 @@ export class UserService {
         }),
       ]);
 
-      const contractIds = workspaceMemberships.map(
-        (membership) => membership.workspace?.contractId,
-      );      
+    const workspaces = workspaceMemberships.map((membership) => ({
+      id: membership.workspace?.id,
+      name: membership.workspace?.workspace_name,
+      contractId: membership.workspace?.contractId,
+    }));
 
     return createResponse(true, 'User profile retrieved successfully', {
       user: {
@@ -138,7 +140,7 @@ export class UserService {
         tasksInProgress,
         completedTasks,
       },
-      workspaces: contractIds,
+      workspaces,
     });
   }
 

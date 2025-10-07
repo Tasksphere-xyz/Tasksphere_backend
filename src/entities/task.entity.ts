@@ -43,8 +43,8 @@ export class Task {
   @Column({ nullable: true })
   description?: string;
 
-  @Column({ nullable: true })
-  assigned_to?: number; // User assigned to the task
+  @Column('simple-array', { nullable: true })
+  assigned_to?: number[];
 
   @Column({ nullable: true })
   attachment?: string;

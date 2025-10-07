@@ -97,46 +97,53 @@ export class TaskService {
     } = createTaskDto;
 
     const foundUser = await this.userService.findUserByEmail(user.email);
-
-    // Validate if the creator is a member of the specified workspace
     await this.workspaceService.checkUserInWorkspace(workspace_id, user.email);
 
-    let assignedUserEmail: string | null = null;
-    if (assigned_to) {
-        const assignedUser = await this.userService.findUserById(assigned_to);
-        if (!assignedUser) {
-            throw new NotFoundException('Assigned user not found.');
-        }
-        // Validate if the assigned user is also a member of the workspace
-        await this.workspaceService.checkUserInWorkspace(workspace_id, assignedUser.email);
-        assignedUserEmail = assignedUser.email;
+    // Validate all assigned users if provided
+    let assignedUserEmails: string[] = [];
+    if (assigned_to && assigned_to.length > 0) {
+      const assignedUsersPromises = assigned_to.map(userId => 
+        this.userService.findUserById(userId)
+      );
+      const assignedUsers = await Promise.all(assignedUsersPromises);
+
+      // Check if all users exist
+      const invalidUserIndex = assignedUsers.findIndex(user => !user);
+      if (invalidUserIndex !== -1) {
+        throw new NotFoundException(`Assigned user with ID ${assigned_to[invalidUserIndex]} not found.`);
+      }
+
+      // Verify all assigned users are in the workspace
+      const membershipChecks = assignedUsers.map(assignedUser =>
+        this.workspaceService.checkUserInWorkspace(workspace_id, assignedUser.email)
+      );
+      await Promise.all(membershipChecks);
+
+      assignedUserEmails = assignedUsers.map(u => u.email);
     }
 
     let attachmentUrl: string = '';
 
     if (filePath) {
-      const newFilename = `${Date.now()}_${
-        foundUser.username
-      }_attachment${path.extname(filePath)}`;
-      const newFilePath = path.resolve(
-        __dirname,
-        `../../../uploads/${newFilename}`,
-      );
+      const newFilename = `${Date.now()}_${foundUser.username}_attachment${path.extname(filePath)}`;
+      const newFilePath = path.resolve(__dirname, `../../../uploads/${newFilename}`);
       fs.renameSync(filePath, newFilePath);
 
-      const extensionName = path.extname(newFilePath);
-      let response: UploadApiResponse;
+      try {
+        const extensionName = path.extname(newFilePath);
+        let response: UploadApiResponse;
 
-      if (extensionName === '.pdf') {
-        response = await this.cloudinaryProvider.uploadPdfToCloud(newFilePath);
-      } else {
-        response = await this.cloudinaryProvider.uploadImageToCloud(
-          newFilePath,
-        );
+        if (extensionName === '.pdf') {
+          response = await this.cloudinaryProvider.uploadPdfToCloud(newFilePath);
+        } else {
+          response = await this.cloudinaryProvider.uploadImageToCloud(newFilePath);
+        }
+        attachmentUrl = response.secure_url;
+        unlinkSavedFile(newFilePath);
+      } catch (error) {
+        unlinkSavedFile(newFilePath);
+        throw new BadRequestException('Failed to upload attachment');
       }
-      attachmentUrl = response.secure_url;
-
-      unlinkSavedFile(newFilePath);
     }
 
     const newTask = this.taskRepository.create({
@@ -148,7 +155,7 @@ export class TaskService {
       status: 'pending',
       priority,
       description,
-      assigned_to,
+      assigned_to: assigned_to && assigned_to.length > 0 ? assigned_to : undefined,
       attachment: attachmentUrl,
       start_date,
       due_date,
@@ -156,20 +163,16 @@ export class TaskService {
 
     await this.taskRepository.save(newTask);
 
-    // Send notification to assigned user
-    if (assigned_to && assignedUserEmail) { // Use assignedUserEmail for notification
-      const assignedUser = await this.userService.findUserById(assigned_to); // Re-fetch or use existing assignedUser object if passed
+    // Send notifications to all assigned users
+    if (assigned_to && assigned_to.length > 0 && assignedUserEmails.length > 0) {
       await this.notificationService.sendNotification(
-        [assignedUser.email],
+        assignedUserEmails,
         NotificationType.ASSIGNED_TASK,
         'New Task Assigned',
-        `Complete '${title}' ${
-          due_date ? `by ${this.formatDate(due_date)}` : ''
-        }`,
+        `Complete '${title}' ${due_date ? `by ${this.formatDate(due_date)}` : ''}`,
       );
     }
 
-    // Send notification to mentioned users in description
     if (description) {
       await this.chatService.sendNotificationToMentionedUsers(
         'task',
@@ -183,75 +186,44 @@ export class TaskService {
     });
   }
 
-  public async getTaskById(taskId: number, userEmail: string) { // Added userEmail for authorization
+  public async getTaskById(taskId: number, userEmail: string) {
     const task = await this.taskRepository.findOne({
         where: { id: taskId },
-        relations: ['workspace'], // Load workspace to check membership
+        relations: ['workspace'],
     });
 
     if (!task) {
       throw new NotFoundException('Task not found');
     }
 
-    // Ensure the requesting user is a member of the task's workspace
     await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
 
-
     const creator = await this.userService.findUserById(task.user_id);
-    let assignee = null;
+    let assignees = [];
 
-    if (task.assigned_to) {
-      assignee = await this.userService.findUserById(Number(task.assigned_to));
+    // Fetch all assigned users
+    if (task.assigned_to && task.assigned_to.length > 0) {
+      const assigneePromises = task.assigned_to.map(userId =>
+        this.userService.findUserById(userId)
+      );
+      assignees = await Promise.all(assigneePromises);
+      // Filter out any null values in case a user was deleted
+      assignees = assignees.filter(assignee => assignee !== null);
     }
 
     return createResponse(true, 'Task retrieved successfully', {
       ...task,
       creator,
-      assignee,
+      assignees, // Changed from assignee to assignees (array)
     });
   }
 
   public async updateTask(
     taskId: number,
     updateData: Partial<CreateTaskDto>,
-    userEmail: string, // Added userEmail for authorization
-    ) {
-    const task = await this.taskRepository.findOne({
-      where: { id: taskId },
-      relations: ['workspace'], // Load workspace to check membership
-    });
-
-    if (!task) {
-      throw new BadRequestException('Task not found');
-    }
-
-    // Ensure the requesting user is a member of the task's workspace
-    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
-
-    // If assigned_to is being updated, validate new assignee's membership
-    if (updateData.assigned_to !== undefined && updateData.assigned_to !== null && updateData.assigned_to !== task.assigned_to) {
-        const newAssignedUser = await this.userService.findUserById(updateData.assigned_to);
-        if (!newAssignedUser) {
-            throw new NotFoundException('New assigned user not found.');
-        }
-        await this.workspaceService.checkUserInWorkspace(task.workspace_id, newAssignedUser.email);
-
-        // Record activity for assignment change
-        await this.createActivity(
-            task.user_id, // User who made the change (creator of task) - adjust if actual modifier is needed
-            task.id,
-            'assignment',
-            `Task assigned from ${task.assigned_to ? (await this.userService.findUserById(task.assigned_to)).username : 'unassigned'} to ${newAssignedUser.username}`,
-        );
-    }
-
-    Object.assign(task, updateData);
-    await this.taskRepository.save(task);
-
-    return createResponse(true, 'Task updated successfully', { task });
-  }
-
-  public async deleteTask(taskId: number, userEmail: string) { // Added userEmail for authorization
+    userEmail: string,
+    filePath?: string,
+  ) {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
       relations: ['workspace'],
@@ -261,7 +233,135 @@ export class TaskService {
       throw new BadRequestException('Task not found');
     }
 
-    // Ensure the requesting user is a member of the task's workspace
+    await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
+
+    // Handle file upload if provided
+    if (filePath) {
+      const foundUser = await this.userService.findUserByEmail(userEmail);
+      
+      const newFilename = `${Date.now()}_${foundUser.username}_attachment${path.extname(filePath)}`;
+      const newFilePath = path.resolve(__dirname, `../../../uploads/${newFilename}`);
+      fs.renameSync(filePath, newFilePath);
+
+      try {
+        const extensionName = path.extname(newFilePath);
+        let response: UploadApiResponse;
+
+        if (extensionName === '.pdf') {
+          response = await this.cloudinaryProvider.uploadPdfToCloud(newFilePath);
+        } else {
+          response = await this.cloudinaryProvider.uploadImageToCloud(newFilePath);
+        }
+
+        if (task.attachment) {
+          await this.cloudinaryProvider.deleteSingleImageFromCloud(task.attachment);
+        }
+
+        updateData.attachment = response.secure_url;
+        unlinkSavedFile(newFilePath);
+      } catch (error) {
+        unlinkSavedFile(newFilePath);
+        throw new BadRequestException('Failed to upload attachment');
+      }
+    }
+
+    // Handle assigned_to updates with multiple users
+    if (updateData.assigned_to !== undefined) {
+      const oldAssignees = task.assigned_to || [];
+      const newAssignees = updateData.assigned_to || [];
+
+      // Check if there are actual changes
+      const hasChanges = 
+        oldAssignees.length !== newAssignees.length ||
+        !oldAssignees.every(id => newAssignees.includes(id));
+
+      if (hasChanges) {
+        // Validate all new assignees exist and are workspace members
+        if (newAssignees.length > 0) {
+          const assigneePromises = newAssignees.map(userId =>
+            this.userService.findUserById(userId)
+          );
+          const assignees = await Promise.all(assigneePromises);
+
+          const invalidUserIndex = assignees.findIndex(user => !user);
+          if (invalidUserIndex !== -1) {
+            throw new NotFoundException(`User with ID ${newAssignees[invalidUserIndex]} not found.`);
+          }
+
+          const membershipChecks = assignees.map(assignee =>
+            this.workspaceService.checkUserInWorkspace(task.workspace_id, assignee.email)
+          );
+          await Promise.all(membershipChecks);
+        }
+
+        // Calculate added and removed assignees
+        const addedAssignees = newAssignees.filter(id => !oldAssignees.includes(id));
+        const removedAssignees = oldAssignees.filter(id => !newAssignees.includes(id));
+
+        // Create activity log
+        let activityMessage = 'Task assignment updated';
+        const changes: string[] = [];
+
+        if (addedAssignees.length > 0) {
+          const addedUsers = await Promise.all(
+            addedAssignees.map(id => this.userService.findUserById(id))
+          );
+          const addedNames = addedUsers.map(u => u.username).join(', ');
+          changes.push(`Added: ${addedNames}`);
+        }
+
+        if (removedAssignees.length > 0) {
+          const removedUsers = await Promise.all(
+            removedAssignees.map(id => this.userService.findUserById(id))
+          );
+          const removedNames = removedUsers.map(u => u.username).join(', ');
+          changes.push(`Removed: ${removedNames}`);
+        }
+
+        if (changes.length > 0) {
+          activityMessage = `Task assignment updated: ${changes.join('; ')}`;
+        }
+
+        await this.createActivity(
+          task.user_id,
+          task.id,
+          'assignment',
+          activityMessage,
+        );
+
+        // Send notifications to newly added assignees
+        if (addedAssignees.length > 0) {
+          const addedUsers = await Promise.all(
+            addedAssignees.map(id => this.userService.findUserById(id))
+          );
+          const emails = addedUsers.map(u => u.email);
+          
+          await this.notificationService.sendNotification(
+            emails,
+            NotificationType.ASSIGNED_TASK,
+            'Task Assigned to You',
+            `You've been assigned to task '${task.title}'`,
+          );
+        }
+      }
+    }
+
+    Object.assign(task, updateData);
+    await this.taskRepository.save(task);
+
+    return createResponse(true, 'Task updated successfully', { task });
+  }
+
+  public async deleteTask(taskId: number, userEmail: string) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      relations: ['workspace'],
+    });
+
+    if (!task) {
+      throw new BadRequestException('Task not found');
+    }
+
     await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
 
     if (task.user_id !== (await this.userService.findUserByEmail(userEmail)).id) {
@@ -282,7 +382,6 @@ export class TaskService {
       throw new UnauthorizedException('Task not found');
     }
 
-    // Ensure the requesting user is a member of the task's workspace
     await this.workspaceService.checkUserInWorkspace(task.workspace_id, user.email);
 
     const foundUser = await this.userService.findUserByEmail(user.email);
@@ -296,6 +395,7 @@ export class TaskService {
       workspace_id: task.workspace_id,
       status: 'pending',
       title: `${task.title} (Copy)`,
+      assigned_to: task.assigned_to, // Copy the entire assignee array
     });
 
     await this.taskRepository.save(newTask);
@@ -305,23 +405,21 @@ export class TaskService {
   public async updateTaskStatus(
     id: number,
     updateTaskStatusDto: UpdateTaskStatusDto,
-    userEmail: string, // Added userEmail for authorization
+    userEmail: string,
   ) {
     const task = await this.findTaskById(id); 
 
-    // Ensure the requesting user is a member of the task's workspace
     await this.workspaceService.checkUserInWorkspace(task.workspace_id, userEmail);
 
     const oldStatus = task.status;
     task.status = updateTaskStatusDto.status;
     await this.taskRepository.save(task);
 
-    // Assuming the user who updates the status is the one whose ID is used for activity
     const userWhoUpdated = await this.userService.findUserByEmail(userEmail);
     if (!userWhoUpdated) throw new NotFoundException('User who updated task not found');
 
     await this.createActivity(
-      userWhoUpdated.id, // Use the ID of the user who performed the action
+      userWhoUpdated.id,
       task.id,
       'status-change',
       `Task status changed from '${oldStatus}' to '${task.status}' by ${userWhoUpdated.username}`,
@@ -347,7 +445,6 @@ export class TaskService {
 
     const query = this.taskRepository.createQueryBuilder('task');
 
-    // IMPORTANT: If a workspaceId is provided, validate user's membership
     if (workspaceId) {
         await this.workspaceService.checkUserInWorkspace(workspaceId, userEmail);
         query.andWhere('task.workspace_id = :workspaceId', { workspaceId });
@@ -377,9 +474,12 @@ export class TaskService {
       query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
     }
 
-
+    // Filter by assignedTo - now checks if the user ID is in the array
     if (assignedTo) {
-      query.andWhere('task.assigned_to = :assignedTo', { assignedTo });
+      // For PostgreSQL with simple-array (comma-separated string)
+      query.andWhere("task.assigned_to LIKE :assignedTo", { 
+        assignedTo: `%${assignedTo}%` 
+      });
     }
 
     if (status) {
@@ -403,7 +503,7 @@ export class TaskService {
       case 'last-updated':
         query.orderBy('task.updatedAt', 'DESC');
         break;
-      default: // Default sort if none provided
+      default:
         query.orderBy('task.createdAt', 'DESC');
         break;
     }
@@ -413,13 +513,22 @@ export class TaskService {
     const [tasks, total] = await query.getManyAndCount();
 
     const enhancedTasks = await Promise.all(
-      tasks.map(async (task) => ({
-        ...task,
-        creator: await this.userService.findUserById(task.user_id),
-        assignee: task.assigned_to
-          ? await this.userService.findUserById(task.assigned_to)
-          : null,
-      })),
+      tasks.map(async (task) => {
+        let assignees = [];
+        if (task.assigned_to && task.assigned_to.length > 0) {
+          const assigneePromises = task.assigned_to.map(userId =>
+            this.userService.findUserById(userId)
+          );
+          assignees = await Promise.all(assigneePromises);
+          assignees = assignees.filter(assignee => assignee !== null);
+        }
+
+        return {
+          ...task,
+          creator: await this.userService.findUserById(task.user_id),
+          assignees, // Changed from assignee to assignees (array)
+        };
+      }),
     );
 
     const totalPages = Math.ceil(total / limit);
@@ -449,7 +558,6 @@ export class TaskService {
 
     const query = this.activityRepository.createQueryBuilder('task_activity');
 
-    // Join with Task entity to filter by workspace_id
     query.innerJoin(Task, 'task', 'task_activity.task_id = task.id');
 
     if (workspaceId) {
@@ -480,7 +588,6 @@ export class TaskService {
       
       query.andWhere('task.workspace_id IN (:...accessibleWorkspaceIds)', { accessibleWorkspaceIds });
     }
-
 
     if (assignedTo !== undefined && assignedTo !== null) {
       query.andWhere('task_activity.user_id = :assignedTo', { assignedTo });

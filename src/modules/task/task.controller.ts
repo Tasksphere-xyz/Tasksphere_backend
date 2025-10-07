@@ -75,16 +75,23 @@ export class TaskController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Task updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid data or task not found' })
   @ApiResponse({ status: 403, description: 'User not authorized to update task' })
   @ApiParam({ name: 'id', description: 'ID of the task' })
+  @UseInterceptors(FileInterceptor('attachment', multerConfig))
   async updateTask(
     @Param('id') id: number,
     @Body() updateData: Partial<CreateTaskDto>,
     @Req() req: Request & { user: UserPayload },
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return await this.taskService.updateTask(id, updateData, req.user.email);
+    let filePath: string = '';
+    if (file) {
+      filePath = file.path;
+    }
+    return await this.taskService.updateTask(id, updateData, req.user.email, filePath);
   }
 
   @Delete(':id')

@@ -27,12 +27,11 @@ export class TaskCronService {
     try {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      // Set hours, minutes, seconds, milliseconds to 0 for a consistent date comparison
       tomorrow.setHours(0, 0, 0, 0);
 
       const tasksDueTomorrow = await this.taskRepository.find({
         where: { due_date: tomorrow },
-        relations: ['workspace'], // Eager load workspace for its name
+        relations: ['workspace'],
       });
 
       if (tasksDueTomorrow.length > 0) {
@@ -40,14 +39,22 @@ export class TaskCronService {
           const assignedTo = task.assigned_to;
           const workspaceName = task.workspace ? task.workspace.workspace_name : 'unknown workspace';
 
-          // Notify the assigned user
-          if (assignedTo) {
-            const assignedUser = await this.userService.findUserById(
-              assignedTo,
+          // Notify all assigned users
+          if (assignedTo && assignedTo.length > 0) {
+            // Fetch all assigned users
+            const assignedUsersPromises = assignedTo.map(userId =>
+              this.userService.findUserById(userId)
             );
-            if (assignedUser) {
+            const assignedUsers = await Promise.all(assignedUsersPromises);
+
+            // Filter out null values (in case user was deleted)
+            const validAssignedUsers = assignedUsers.filter(user => user !== null);
+
+            if (validAssignedUsers.length > 0) {
+              const emails = validAssignedUsers.map(user => user.email);
+              
               await this.notificationService.sendNotification(
-                [assignedUser.email],
+                emails,
                 NotificationType.TASK_DEADLINE,
                 'Task Deadline Approaching',
                 `Task '${task.title}' in workspace '${workspaceName}' is due tomorrow.`,
