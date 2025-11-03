@@ -30,8 +30,8 @@ import { Workspace } from 'src/entities/workspace.entity';
 
 @Injectable()
 export class TaskService {
+   private readonly logger = new Logger(TaskService.name);
   constructor(
-    private readonly logger: Logger,
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
     @InjectRepository(Activity)
