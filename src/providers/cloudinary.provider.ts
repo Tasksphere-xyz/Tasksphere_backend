@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiOptions } from 'cloudinary';
 import * as dotenv from 'dotenv';
