@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
@@ -30,6 +31,7 @@ import { Workspace } from 'src/entities/workspace.entity';
 @Injectable()
 export class TaskService {
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
     @InjectRepository(Activity)
@@ -97,8 +99,9 @@ export class TaskService {
     } = createTaskDto;
 
     const foundUser = await this.userService.findUserByEmail(user.email);
+    this.logger.log(`Creating task for user: ${foundUser.username} in workspace ID: ${workspace_id}`);
     await this.workspaceService.checkUserInWorkspace(workspace_id, user.email);
-
+    this.logger.log(`User ${foundUser.username} is verified in workspace ID: ${workspace_id}`);
     // Validate all assigned users if provided
     let assignedUserEmails: string[] = [];
     if (assigned_to && assigned_to.length > 0) {
