@@ -37,12 +37,9 @@ export class WorkspaceService {
   private async checkWorkspaceMembership(
     workspace_id: number,
     email: string,
-    status?: 'accepted' | 'pending' | 'declined',
   ) {
-    const whereConditions: any = { workspace_id, email };
-    if (status) {
-      whereConditions.status = status;
-    }
+    const whereConditions: any = { workspace_id, email,status: 'accepted' };
+  
 
     const membership = await this.workspaceMembershipRepository.findOne({
       where: whereConditions,
