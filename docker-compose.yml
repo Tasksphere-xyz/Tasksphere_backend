@@ -1,0 +1,47 @@
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tasksphere
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      DB_TYPE: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: nestdb
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+    networks:
+      - app-network
+
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: nestdb
+      MYSQL_USER: nestuser
+      MYSQL_PASSWORD: nestpassword
+    ports:
+      - "3307:3306"  # host:container
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

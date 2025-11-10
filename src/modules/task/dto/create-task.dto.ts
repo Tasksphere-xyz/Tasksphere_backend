@@ -44,12 +44,9 @@ export class CreateTaskDto {
   })
   @IsOptional()
   @Transform(({ value }) => {
-    // If the input is already an array, return it
     if (Array.isArray(value)) return value.map((v) => Number(v));
-    // If it's a comma-separated string, split and convert to numbers
     if (typeof value === 'string')
       return value.split(',').map((v) => Number(v.trim()));
-    // Otherwise, wrap a single value in an array
     return [Number(value)];
   })
   @IsArray()
