@@ -18,6 +18,8 @@ export class EmailService {
        tls: {
         rejectUnauthorized: false,
       },
+      connectionTimeout: 10000,
+
     } as TransportOptions);
   }
   async sendEmail(to: string, subject: string, html: string) {
