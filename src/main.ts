@@ -50,7 +50,7 @@ async function bootstrap() {
   );
 
  ;
-app.listen(3000, () => console.log(`Server running on ${port}`));
+app.listen(3000, () => console.log(`Server running on ${3000}`));
 
 }
 bootstrap();
