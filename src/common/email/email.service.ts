@@ -8,13 +8,15 @@ export class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: Number(process.env.EMAIL_PORT),
+      host: "smtp.gmail.com",
+      port: 587,
       secure: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
+      tls: { rejectUnauthorized: false },
+
     } as TransportOptions);
   }
   async sendEmail(to: string, subject: string, html: string) {
