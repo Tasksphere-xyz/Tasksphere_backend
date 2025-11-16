@@ -15,9 +15,6 @@ export class EmailService {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
-      tls: {
-        rejectUnauthorized: false
-      }
     } as TransportOptions);
   }
   async sendEmail(to: string, subject: string, html: string) {
