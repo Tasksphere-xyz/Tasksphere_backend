@@ -41,6 +41,8 @@ export class WorkspaceService {
   private handleError(error: any, methodName: string): never {
     const message = error?.message || 'Unknown error';
     this.logger.error(`[${methodName}] ${message}`, error?.stack || '');
+    this.logger.log(error)
+  
     throw error;
   }
 
