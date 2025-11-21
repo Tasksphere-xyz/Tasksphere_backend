@@ -16,6 +16,8 @@ export class CreateTaskDto {
   @ApiProperty({ description: 'ID of the workspace this task belongs to' })
   @IsNotEmpty()
   @IsNumber()
+  @Type(() => Number)
+
   workspace_id: number;
   
   @ApiProperty({ description: 'Title of the task' })
