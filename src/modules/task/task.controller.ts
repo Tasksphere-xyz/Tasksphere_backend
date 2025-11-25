@@ -42,7 +42,7 @@ export class TaskController {
   @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Task created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid data or user not in workspace' }) // Updated description
+  @ApiResponse({ status: 400, description: 'Invalid data, invalid file type, or file size exceeded' })
   @ApiParam({ name: 'contractId', description: 'id of the contract' })
   @UseInterceptors(FileInterceptor('attachment', multerConfig))
   async createTask(
@@ -77,7 +77,7 @@ export class TaskController {
   @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Task updated successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid data or task not found' })
+  @ApiResponse({ status: 400, description: 'Invalid data, invalid file type, or file size exceeded' })
   @ApiResponse({ status: 403, description: 'User not authorized to update task' })
   @ApiParam({ name: 'id', description: 'ID of the task' })
   @UseInterceptors(FileInterceptor('attachment', multerConfig))
@@ -131,6 +131,68 @@ export class TaskController {
     @Req() req: Request & { user: UserPayload },
   ) {
     return this.taskService.updateTaskStatus(Number(id), updateTaskStatusDto, req.user.email);
+  }
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Task history retrieved successfully',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'workspaceId',
+    required: false,
+    type: Number,
+    description: 'ID of the workspace to filter task history by. If not provided, history from all user workspaces are returned.',
+  })
+  @ApiQuery({
+    name: 'assignedTo',
+    required: false,
+    type: Number,
+    description: 'User ID of the assigned user',
+  })
+  @ApiQuery({
+    name: 'action',
+    required: false,
+    enum: ['status-change', 'assignment'],
+    description: 'Filter by action type',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  async getTaskHistory(
+    @Req() req: Request & { user: UserPayload },
+    @Query('page') page: number = 1,
+    @Query('workspaceId') workspaceId?: number,
+    @Query('assignedTo') assignedTo?: number,
+    @Query('action') action?: 'status-change' | 'assignment',
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.taskService.getAllTaskHistory(
+      req.user.email,
+      page,
+      workspaceId,
+      assignedTo,
+      action,
+      from,
+      to,
+    );
   }
 
   @Get('/')
@@ -190,68 +252,6 @@ export class TaskController {
       sortBy,
       status,
       priority,
-    );
-  }
-
-  @Get('/history')
-  @UseGuards(JwtAuthGuard)
-  @ApiResponse({
-    status: 200,
-    description: 'Task history retrieved successfully',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number for pagination',
-  })
-  @ApiQuery({
-    name: 'workspaceId',
-    required: false,
-    type: Number,
-    description: 'ID of the workspace to filter task history by. If not provided, history from all user workspaces are returned.',
-  })
-  @ApiQuery({
-    name: 'assignedTo',
-    required: false,
-    type: Number,
-    description: 'User ID of the assigned user',
-  })
-  @ApiQuery({
-    name: 'action',
-    required: false,
-    enum: ['status-change', 'assignment'],
-    description: 'Filter by action type',
-  })
-  @ApiQuery({
-    name: 'from',
-    required: false,
-    type: String,
-    description: 'Start date (YYYY-MM-DD)',
-  })
-  @ApiQuery({
-    name: 'to',
-    required: false,
-    type: String,
-    description: 'End date (YYYY-MM-DD)',
-  })
-  async getTaskHistory(
-    @Req() req: Request & { user: UserPayload },
-    @Query('page') page: number = 1,
-    @Query('workspaceId') workspaceId?: number,
-    @Query('assignedTo') assignedTo?: number,
-    @Query('action') action?: 'status-change' | 'assignment',
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.taskService.getAllTaskHistory(
-      req.user.email,
-      page,
-      workspaceId,
-      assignedTo,
-      action,
-      from,
-      to,
     );
   }
 
