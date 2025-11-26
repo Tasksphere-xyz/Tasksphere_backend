@@ -1,6 +1,6 @@
 import { diskStorage, FileFilterCallback } from 'multer';
-import { BadRequestException } from '@nestjs/common';
 import * as path from 'path';
+import { Request } from 'express';
 
 const storage = diskStorage({
   destination: (req, file, cb) => {
@@ -34,10 +34,14 @@ export const multerConfig = {
       'application/pdf',
       'text/plain',
     ];
+
     if (!allowedMimes.includes(file.mimetype)) {
-      cb(new BadRequestException('Only PDF, JPEG, PNG, and TXT files are allowed'), false);
-    } else {
-      cb(null, true);
+      return cb(
+        new Error('Only PDF, JPEG, PNG, and TXT files are allowed'),
+        false,
+      );
     }
+
+    cb(null, true);
   },
 };
