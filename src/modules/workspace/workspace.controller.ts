@@ -118,4 +118,21 @@ export class WorkspaceController {
     const user = req.user;
     return await this.workspaceService.getAllUserWorkspaces(user);
   }
+
+  @Post(':workspaceId/delete')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Workspace deleted successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Only workspace owner can delete' })
+  @ApiResponse({ status: 404, description: 'Workspace not found' })
+  @ApiParam({ name: 'workspaceId', description: 'ID of the workspace to delete' })
+  async deleteWorkspace(
+    @Param('workspaceId') workspaceId: number,
+    @Req() req: Request & { user: UserPayload },
+  ) {
+    const user = req.user;
+    return await this.workspaceService.deleteWorkspace(workspaceId, user);
+  }
 }

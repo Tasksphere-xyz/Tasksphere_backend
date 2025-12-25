@@ -222,6 +222,7 @@ export class WorkspaceService {
           'user.displayPic AS user_displayPic',
         ])
         .where('membership.workspace_id = :workspaceId', { workspaceId: workspace_id })
+        .andWhere('membership.status = :status', { status: 'accepted' })
         .orderBy('membership.createdAt', 'DESC')
         .skip(skip)
         .take(limit)
@@ -355,6 +356,26 @@ export class WorkspaceService {
       });
     } catch (error) {
       this.handleError(error, 'getAllUserWorkspaces');
+    }
+  }
+
+  async deleteWorkspace(workspace_id: number, user: UserPayload) {
+    try {
+      const workspace = await this.workspaceRepository.findOne({ where: { id: workspace_id } });
+      if (!workspace) throw new NotFoundException('Workspace not found');
+
+      const userMembership = await this.checkUserInWorkspace(workspace_id, user.email);
+      if (!userMembership || userMembership.role !== 'owner') {
+        throw new ForbiddenException('Only workspace owner can delete the workspace');
+      }
+
+      await this.workspaceMembershipRepository.delete({ workspace_id });
+      await this.taskRepository.delete({ workspace_id });
+      await this.workspaceRepository.delete({ id: workspace_id });
+
+      return createResponse(true, 'Workspace deleted successfully', {});
+    } catch (error) {
+      this.handleError(error, 'deleteWorkspace');
     }
   }
 }
